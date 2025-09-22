@@ -1,75 +1,78 @@
-<<<<<<< HEAD
-# Getting Started with Create React App
+📌 Crossover Helpdesk
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A full-stack helpdesk system built with React (client) and Node.js/Express (server).
 
-## Available Scripts
+🚀 Features
 
-In the project directory, you can run:
+Ticket creation, assignment, and tracking
 
-### `npm start`
+User authentication (agents & customers)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+REST API backend with Express
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Modern frontend UI with React
 
-### `npm test`
+Easy local development setup
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+🗂 Project Structure
+crossover-helpdesk/
+├── client/ # React frontend
+├── server/ # Express backend
+└── README.md
 
-### `npm run build`
+🔧 Installation & Setup
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. Clone the repo
+   git clone git@github.com:samritbasnet/crossover-helpdesk.git
+   cd crossover-helpdesk
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+2. Setup server
+   cd server
+   npm install
+   npm run dev # or npm start
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Server runs at http://localhost:5000
 
-### `npm run eject`
+3. Setup client
+   cd client
+   npm install
+   npm start
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Client runs at http://localhost:3000
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+⚙️ Available Scripts
+Server (inside /server)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+npm run dev → start backend with hot reload (nodemon)
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+npm start → start backend in production mode
 
-## Learn More
+Client (inside /client)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+npm start → start React app
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+npm run build → build for production
 
-### Code Splitting
+📄 Environment Variables
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Create a .env file inside server/:
 
-### Analyzing the Bundle Size
+PORT=5000
+MONGO_URI=your_mongo_connection_string
+JWT_SECRET=your_secret
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+🛠 Tech Stack
 
-### Making a Progressive Web App
+Frontend: React, Axios, Bootstrap/Tailwind (your choice)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Backend: Node.js, Express, MongoDB
 
-### Advanced Configuration
+Auth: JWT-based authentication
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+📌 Future Improvements
 
-### Deployment
+Role-based access control (admin, agent, user)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Email notifications
 
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-=======
-# helpdesk-system
->>>>>>> 1b1406b88a676222f10569079100879012df516b
-# crossover-helpdesk
+Analytics dashboard
