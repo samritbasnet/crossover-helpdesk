@@ -148,7 +148,7 @@ const getTickets = async (req, res) => {
     // Role-based access control
     if (userRole !== "admin") {
       conditions.push("t.user_id = ?");
-      params.push(userId);
+      params.push(parseInt(userId));
     }
 
     // Add filters
@@ -210,7 +210,7 @@ const getTickets = async (req, res) => {
     // Apply same filters for count
     if (userRole !== "admin") {
       countConditions.push("t.user_id = ?");
-      countParams.push(userId);
+      countParams.push(parseInt(userId));
     }
 
     if (status) {
@@ -246,7 +246,7 @@ const getTickets = async (req, res) => {
 
     if (userRole !== "admin") {
       statsQuery += " WHERE user_id = ?";
-      statsParams.push(userId);
+      statsParams.push(parseInt(userId));
     }
 
     statsQuery += " GROUP BY status";
@@ -323,8 +323,8 @@ const getTicket = async (req, res) => {
     // Check access permissions
     if (
       userRole !== "admin" &&
-      ticket.user_id !== userId &&
-      ticket.assigned_to !== userId
+      ticket.user_id !== parseInt(userId) &&
+      ticket.assigned_to !== parseInt(userId)
     ) {
       return res.status(403).json({
         success: false,
@@ -389,11 +389,20 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Check permissions
+    // Check permissions - Debug logging
+    console.log("Permission check:", {
+      userRole,
+      userId,
+      ticketUserId: ticket.user_id,
+      ticketAssignedTo: ticket.assigned_to,
+      userIdType: typeof userId,
+      ticketUserIdType: typeof ticket.user_id
+    });
+
     const canEdit =
       userRole === "admin" ||
-      ticket.user_id === userId ||
-      ticket.assigned_to === userId;
+      ticket.user_id === parseInt(userId) ||
+      ticket.assigned_to === parseInt(userId);
 
     if (!canEdit) {
       return res.status(403).json({
@@ -519,7 +528,7 @@ const deleteTicket = async (req, res) => {
     }
 
     // Check permissions - only admin or ticket owner can delete
-    if (userRole !== "admin" && ticket.user_id !== userId) {
+    if (userRole !== "admin" && ticket.user_id !== parseInt(userId)) {
       return res.status(403).json({
         success: false,
         message:
