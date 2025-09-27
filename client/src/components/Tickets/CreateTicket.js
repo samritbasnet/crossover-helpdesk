@@ -16,7 +16,6 @@ import {
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ErrorMessage from "../common/ErrorMessage";
-import Loading from "../common/Loading";
 import { useAuth } from "../../context/AuthContext";
 import { ticketsAPI } from "../../services/api";
 import { getErrorMessage } from "../../utils/helpers";
