@@ -12,9 +12,11 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
+      "http://localhost:3001", // React dev server default port
       "http://127.0.0.1:3000",
-      "http://localhost:5173",
-    ], // Added Vite default port
+      "http://127.0.0.1:3001",
+      "http://localhost:5173", // Vite default port
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
@@ -85,7 +87,7 @@ const startServer = async () => {
     const server = app.listen(PORT, () => {
       console.log(`✅ Server is running on http://localhost:${PORT}`);
       console.log(
-        `✅ CORS enabled for: http://localhost:3000, http://localhost:5173`
+        `✅ CORS enabled for: http://localhost:3000, http://localhost:3001, http://localhost:5173`
       );
       console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
     });
