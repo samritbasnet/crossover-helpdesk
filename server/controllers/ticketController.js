@@ -389,16 +389,7 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Check permissions - Debug logging
-    console.log("Permission check:", {
-      userRole,
-      userId,
-      ticketUserId: ticket.user_id,
-      ticketAssignedTo: ticket.assigned_to,
-      userIdType: typeof userId,
-      ticketUserIdType: typeof ticket.user_id
-    });
-
+    // Check permissions
     const canEdit =
       userRole === "admin" ||
       ticket.user_id === parseInt(userId) ||

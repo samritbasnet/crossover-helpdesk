@@ -1,10 +1,8 @@
 // Create Ticket Component - Form for users to submit new support tickets
 import { ArrowBack, Save } from "@mui/icons-material";
 import {
-  Alert,
   Box,
   Button,
-  CircularProgress,
   Container,
   FormControl,
   Grid,
@@ -17,15 +15,19 @@ import {
 } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ErrorMessage from "../common/ErrorMessage";
+import Loading from "../common/Loading";
 import { useAuth } from "../../context/AuthContext";
 import { ticketsAPI } from "../../services/api";
+import { getErrorMessage } from "../../utils/helpers";
+import { TICKET_PRIORITY } from "../../utils/constants";
 
 const CreateTicket = () => {
   // State for form data
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    priority: "medium",
+    priority: TICKET_PRIORITY.MEDIUM,
   });
 
   // State for UI
@@ -90,7 +92,7 @@ const CreateTicket = () => {
         setFormData({
           title: "",
           description: "",
-          priority: "medium",
+          priority: TICKET_PRIORITY.MEDIUM,
         });
 
         // Redirect to dashboard after 2 seconds
@@ -101,7 +103,7 @@ const CreateTicket = () => {
         setError(result.message || "Failed to create ticket");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "An unexpected error occurred");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -141,16 +143,14 @@ const CreateTicket = () => {
             Submit a support request and our team will help you resolve it.
           </Typography>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
+          <ErrorMessage error={error} />
 
           {success && (
-            <Alert severity="success" sx={{ mb: 3 }}>
-              Ticket created successfully! Redirecting to dashboard...
-            </Alert>
+            <ErrorMessage 
+              error="Ticket created successfully! Redirecting to dashboard..." 
+              severity="success"
+              title="Success"
+            />
           )}
 
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
@@ -183,7 +183,7 @@ const CreateTicket = () => {
                     label="Priority"
                     onChange={handleChange}
                   >
-                    <MenuItem value="low">
+                    <MenuItem value={TICKET_PRIORITY.LOW}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -197,7 +197,7 @@ const CreateTicket = () => {
                         Low - General questions
                       </Box>
                     </MenuItem>
-                    <MenuItem value="medium">
+                    <MenuItem value={TICKET_PRIORITY.MEDIUM}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -211,7 +211,7 @@ const CreateTicket = () => {
                         Medium - Minor issues
                       </Box>
                     </MenuItem>
-                    <MenuItem value="high">
+                    <MenuItem value={TICKET_PRIORITY.HIGH}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -225,7 +225,7 @@ const CreateTicket = () => {
                         High - Important issues
                       </Box>
                     </MenuItem>
-                    <MenuItem value="urgent">
+                    <MenuItem value={TICKET_PRIORITY.URGENT}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -293,7 +293,7 @@ const CreateTicket = () => {
               <Button
                 type="submit"
                 variant="contained"
-                startIcon={loading ? <CircularProgress size={20} /> : <Save />}
+                startIcon={loading ? null : <Save />}
                 disabled={loading}
                 size="large"
               >
