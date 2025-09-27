@@ -389,11 +389,24 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Check permissions
+    // Check permissions - Debug logging
+    console.log("=== PERMISSION DEBUG ===");
+    console.log("User Role:", userRole);
+    console.log("User ID from JWT:", userId, typeof userId);
+    console.log("Ticket User ID:", ticket.user_id, typeof ticket.user_id);
+    console.log("Ticket Assigned To:", ticket.assigned_to, typeof ticket.assigned_to);
+    console.log("parseInt(userId):", parseInt(userId));
+    console.log("Comparison 1 (admin):", userRole === "admin");
+    console.log("Comparison 2 (owner):", ticket.user_id === parseInt(userId));
+    console.log("Comparison 3 (assigned):", ticket.assigned_to === parseInt(userId));
+    
     const canEdit =
       userRole === "admin" ||
       ticket.user_id === parseInt(userId) ||
       ticket.assigned_to === parseInt(userId);
+    
+    console.log("Final canEdit result:", canEdit);
+    console.log("========================");
 
     if (!canEdit) {
       return res.status(403).json({
