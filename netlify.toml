@@ -1,0 +1,26 @@
+# Netlify configuration for React frontend
+[build]
+  base = "client"
+  publish = "client/build"
+  command = "CI=false npm run build"
+
+[build.environment]
+  NODE_VERSION = "18"
+  CI = "false"
+  REACT_APP_API_BASE = "https://crossover-helpdesk.onrender.com/api"
+  REACT_APP_NAME = "Crossover Helpdesk"
+
+# Redirect all routes to index.html for React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

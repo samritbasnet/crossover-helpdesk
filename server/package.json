@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "build": "echo 'No build step needed for Node.js'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
