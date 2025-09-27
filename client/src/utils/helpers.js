@@ -61,6 +61,36 @@ export const getErrorMessage = (error) => {
   return 'An unexpected error occurred';
 };
 
+// Check if error is network-related
+export const isNetworkError = (error) => {
+  return (
+    !error.response || 
+    error.code === 'NETWORK_ERROR' ||
+    error.code === 'ECONNABORTED' ||
+    error.message === 'Network Error'
+  );
+};
+
+// Get user-friendly error type
+export const getErrorType = (error) => {
+  if (isNetworkError(error)) {
+    return 'network';
+  }
+  if (error.response?.status === 401) {
+    return 'auth';
+  }
+  if (error.response?.status === 403) {
+    return 'permission';
+  }
+  if (error.response?.status === 404) {
+    return 'notfound';
+  }
+  if (error.response?.status >= 500) {
+    return 'server';
+  }
+  return 'client';
+};
+
 // Check if user has permission
 export const hasPermission = (user, requiredRole) => {
   const roleHierarchy = { user: 1, agent: 2, admin: 3 };

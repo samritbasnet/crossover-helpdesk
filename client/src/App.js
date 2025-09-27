@@ -20,6 +20,7 @@ import TicketDetails from "./components/Tickets/TicketDetails";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import AgentDashboard from "./pages/AgentDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import NotFound from "./pages/NotFound";
 import UserDashboard from "./pages/UserDashboard";
 import { USER_ROLES } from "./utils/constants";
 
@@ -142,6 +143,9 @@ const AppRoutes = () => {
 
             {/* Default Route */}
             <Route path="/" element={<Navigate to="/dashboard" />} />
+            
+            {/* 404 Route - Must be last */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </ThemeProvider>

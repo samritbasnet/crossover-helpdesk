@@ -19,22 +19,32 @@ crossover-helpdesk/
 
 🔧 Quick Start
 
-1) Server
+1) **Server Setup**
 
-```
+```bash
 cd server
 npm install
-cp .env.example .env  # if present (or create .env as below)
-npm run dev            # starts at http://localhost:3000
+cp .env.example .env  # Copy environment template
+# Edit .env file with your settings
+npm run dev           # starts at http://localhost:3000
 ```
 
-2) Client
+2) **Client Setup**
 
-```
+```bash
 cd client
 npm install
-# optional: create .env and set REACT_APP_API_BASE=http://localhost:3000/api
-npm start             # opens http://localhost:3000 for CRA, or 5173 for Vite
+cp .env.example .env  # Copy environment template
+# Edit .env file with your API URL
+npm start             # opens http://localhost:3001 (CRA default)
+```
+
+3) **First Time Setup**
+
+```bash
+# The database will be created automatically
+# Default admin user will be created on first run
+# Or create a user via the signup page
 ```
 
 📄 Environment Variables
@@ -76,7 +86,75 @@ Client (inside `client/`):
 - Backend: Node.js, Express, sqlite3
 - Auth: JWT
 
-✅ Notes
+📚 Documentation
 
-- The backend uses a single lightweight database (SQLite) and simple helpers (`runQuery/getQuery/getAllQuery`) for clarity.
-- Set `REACT_APP_API_BASE` in `client/.env` to point the client to the server.
+- **API Documentation**: See [API.md](./API.md) for complete endpoint documentation
+- **Environment Setup**: Use `.env.example` files as templates
+- **Database**: SQLite database created automatically on first run
+
+🚀 Deployment
+
+**Production Deployment:**
+
+1) **Server (Node.js hosting)**
+```bash
+cd server
+npm install --production
+cp .env.example .env
+# Set production environment variables
+npm start
+```
+
+2) **Client (Static hosting)**
+```bash
+cd client
+cp .env.example .env
+# Set REACT_APP_API_BASE to your production API URL
+npm run build
+# Deploy the 'build' folder to your static host
+```
+
+**Docker Deployment:**
+```bash
+# Build and run with Docker Compose (if docker-compose.yml exists)
+docker-compose up --build
+```
+
+🔧 Development
+
+**Available Scripts:**
+- `npm run dev` - Start development server with hot reload
+- `npm start` - Start production server
+- `npm test` - Run tests (if configured)
+
+**Code Quality:**
+- ESLint configured for consistent code style
+- Prettier for code formatting
+- Zero warnings/errors in production build
+
+✅ Features
+
+- **Authentication**: JWT-based with role management (user/agent/admin)
+- **Ticket Management**: Full CRUD with status tracking and assignment
+- **Knowledge Base**: Self-service articles with search and voting
+- **User Management**: Profile management and role-based permissions
+- **Responsive Design**: Works on desktop, tablet, and mobile
+- **Error Handling**: Comprehensive error states and network error recovery
+- **Professional UI**: Material-UI components with consistent theming
+
+🛡️ Security
+
+- JWT token authentication
+- Password hashing with bcrypt
+- CORS protection
+- Input validation and sanitization
+- Role-based access control
+- SQL injection prevention with parameterized queries
+
+📊 Performance
+
+- Lightweight SQLite database
+- Efficient pagination for large datasets
+- Optimized React components with proper state management
+- Lazy loading and code splitting ready
+- Production-optimized builds
