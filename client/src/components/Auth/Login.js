@@ -34,8 +34,20 @@ const Login = () => {
       ...formData,
       [e.target.name]: e.target.value,
     });
-    // Clear error when user starts typing
-    if (error) setError("");
+    if (error) setError(""); // clear error on typing
+  };
+
+  // Validate form
+  const validateForm = () => {
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      setError("Invalid email format");
+      return false;
+    }
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      return false;
+    }
+    return true;
   };
 
   // Handle form submission
@@ -44,22 +56,27 @@ const Login = () => {
     setLoading(true);
     setError("");
 
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const result = await login(formData);
 
       if (result.success) {
         // Redirect based on user role
         const user = JSON.parse(localStorage.getItem("user"));
-        if (user.role === "agent") {
+        if (user?.role === "agent") {
           navigate("/agent-dashboard");
         } else {
           navigate("/dashboard");
         }
       } else {
-        setError(result.message);
+        setError(result.message || "Invalid credentials, please try again.");
       }
     } catch (err) {
-      setError("An unexpected error occurred");
+      setError("An unexpected error occurred. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -122,6 +139,7 @@ const Login = () => {
               value={formData.password}
               onChange={handleChange}
               disabled={loading}
+              helperText="At least 6 characters"
             />
 
             <Button
@@ -136,7 +154,7 @@ const Login = () => {
 
             <Box textAlign="center">
               <Typography variant="body2">
-                Don't have an account?{" "}
+                Don’t have an account?{" "}
                 <Link to="/signup" style={{ textDecoration: "none" }}>
                   Sign up here
                 </Link>

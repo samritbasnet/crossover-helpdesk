@@ -41,18 +41,27 @@ const Signup = () => {
       ...formData,
       [e.target.name]: e.target.value,
     });
-    // Clear error when user starts typing
-    if (error) setError("");
+    if (error) setError(""); // clear error when typing
   };
 
   // Validate form
   const validateForm = () => {
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      setError("Invalid email format");
+      return false;
+    }
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return false;
     }
     if (formData.password.length < 6) {
       setError("Password must be at least 6 characters long");
+      return false;
+    }
+    if (!/(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])/.test(formData.password)) {
+      setError(
+        "Password must include uppercase, number, and special character"
+      );
       return false;
     }
     return true;
@@ -70,20 +79,17 @@ const Signup = () => {
     }
 
     try {
-      // Remove confirmPassword from data sent to server
+      // Remove confirmPassword before sending to backend
       const { confirmPassword, ...signupData } = formData;
-
       const result = await signup(signupData);
 
       if (result.success) {
         // Redirect based on user role
-        if (signupData.role === "agent") {
-          navigate("/agent-dashboard");
-        } else {
-          navigate("/dashboard");
-        }
+        navigate(
+          signupData.role === "agent" ? "/agent-dashboard" : "/dashboard"
+        );
       } else {
-        setError(result.message);
+        setError(result.message || "Signup failed. Please try again.");
       }
     } catch (err) {
       setError("An unexpected error occurred");
@@ -179,7 +185,7 @@ const Signup = () => {
               value={formData.password}
               onChange={handleChange}
               disabled={loading}
-              helperText="Password must be at least 6 characters long"
+              helperText="At least 6 characters, 1 uppercase, 1 number, 1 special character"
             />
 
             <TextField
@@ -193,6 +199,16 @@ const Signup = () => {
               value={formData.confirmPassword}
               onChange={handleChange}
               disabled={loading}
+              error={
+                formData.password !== formData.confirmPassword &&
+                formData.confirmPassword !== ""
+              }
+              helperText={
+                formData.password !== formData.confirmPassword &&
+                formData.confirmPassword !== ""
+                  ? "Passwords do not match"
+                  : ""
+              }
             />
 
             <Button

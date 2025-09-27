@@ -1,21 +1,25 @@
 // User Dashboard - Main page for regular users
 import { Add, Support } from "@mui/icons-material";
 import {
-  Alert,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
-  CircularProgress,
   Container,
   Grid,
   Typography,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import EmptyState from "../components/common/EmptyState";
+import ErrorMessage from "../components/common/ErrorMessage";
+import Loading from "../components/common/Loading";
+import StatsCard from "../components/common/StatsCard";
+import TicketCard from "../components/common/TicketCard";
 import { useAuth } from "../context/AuthContext";
 import { ticketsAPI } from "../services/api";
+import { getErrorMessage } from "../utils/helpers";
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -32,59 +36,22 @@ const UserDashboard = () => {
   const loadTickets = async () => {
     try {
       setLoading(true);
+      setError("");
       const response = await ticketsAPI.getTickets();
-      // Handle the response structure from our backend
-      // Backend returns: { success: true, data: { tickets: [...], total: X, page: Y, totalPages: Z } }
-      setTickets(response.data?.tickets || []);
+      // Backend returns: { success: true, tickets: [...], pagination: {...}, stats: {...} }
+      setTickets(response.tickets || []);
     } catch (err) {
       console.error("Load tickets error:", err);
-      setError("Failed to load tickets");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Get status color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "open":
-        return "default";
-      case "in_progress":
-        return "warning";
-      case "resolved":
-        return "success";
-      default:
-        return "default";
-    }
-  };
-
-  // Get priority color
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "low":
-        return "success";
-      case "medium":
-        return "warning";
-      case "high":
-        return "error";
-      case "urgent":
-        return "error";
-      default:
-        return "default";
     }
   };
 
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          minHeight="400px"
-        >
-          <CircularProgress />
-        </Box>
+        <Loading message="Loading your tickets..." />
       </Container>
     );
   }
@@ -119,70 +86,36 @@ const UserDashboard = () => {
       {/* Stats Cards */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center">
-                <Support color="primary" sx={{ mr: 2 }} />
-                <Box>
-                  <Typography variant="h6">{tickets.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Tickets
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+          <StatsCard
+            icon={Support}
+            title="Total Tickets"
+            value={tickets.length}
+            color="primary"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center">
-                <Support color="warning" sx={{ mr: 2 }} />
-                <Box>
-                  <Typography variant="h6">
-                    {tickets.filter((t) => t.status === "open").length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Open Tickets
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+          <StatsCard
+            icon={Support}
+            title="Open Tickets"
+            value={tickets.filter((t) => t.status === "open").length}
+            color="warning"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center">
-                <Support color="info" sx={{ mr: 2 }} />
-                <Box>
-                  <Typography variant="h6">
-                    {tickets.filter((t) => t.status === "in_progress").length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    In Progress
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+          <StatsCard
+            icon={Support}
+            title="In Progress"
+            value={tickets.filter((t) => t.status === "in-progress").length}
+            color="info"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center">
-                <Support color="success" sx={{ mr: 2 }} />
-                <Box>
-                  <Typography variant="h6">
-                    {tickets.filter((t) => t.status === "resolved").length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Resolved
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+          <StatsCard
+            icon={Support}
+            title="Resolved"
+            value={tickets.filter((t) => t.status === "resolved").length}
+            color="success"
+          />
         </Grid>
       </Grid>
 
@@ -191,88 +124,21 @@ const UserDashboard = () => {
         Your Recent Tickets
       </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      <ErrorMessage error={error} />
 
       {tickets.length === 0 ? (
-        <Card>
-          <CardContent>
-            <Box textAlign="center" py={4}>
-              <Support sx={{ fontSize: 64, color: "text.secondary", mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No tickets yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary" mb={3}>
-                Create your first support ticket to get started
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => navigate("/create-ticket")}
-              >
-                Create Ticket
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Support}
+          title="No tickets yet"
+          description="Create your first support ticket to get started"
+          actionLabel="Create Ticket"
+          onAction={() => navigate("/create-ticket")}
+        />
       ) : (
         <Grid container spacing={2}>
           {tickets.slice(0, 6).map((ticket) => (
             <Grid item xs={12} md={6} key={ticket.id}>
-              <Card
-                sx={{
-                  cursor: "pointer",
-                  "&:hover": { boxShadow: 3 },
-                }}
-                onClick={() => navigate(`/ticket/${ticket.id}`)}
-              >
-                <CardContent>
-                  <Box
-                    display="flex"
-                    justifyContent="space-between"
-                    alignItems="flex-start"
-                    mb={2}
-                  >
-                    <Typography variant="h6" component="h3" noWrap>
-                      {ticket.title}
-                    </Typography>
-                    <Box display="flex" gap={1}>
-                      <Chip
-                        label={ticket.status}
-                        color={getStatusColor(ticket.status)}
-                        size="small"
-                      />
-                      <Chip
-                        label={ticket.priority}
-                        color={getPriorityColor(ticket.priority)}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </Box>
-                  </Box>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{
-                      mb: 2,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {ticket.description}
-                  </Typography>
-
-                  <Typography variant="caption" color="text.secondary">
-                    Created: {new Date(ticket.createdAt).toLocaleDateString()}
-                  </Typography>
-                </CardContent>
-              </Card>
+              <TicketCard ticket={ticket} />
             </Grid>
           ))}
         </Grid>

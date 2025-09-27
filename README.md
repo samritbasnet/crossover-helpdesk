@@ -1,78 +1,82 @@
 📌 Crossover Helpdesk
 
-A full-stack helpdesk system built with React (client) and Node.js/Express (server).
+A simple full‑stack helpdesk built with React (client) and Node.js/Express + SQLite (server).
 
 🚀 Features
 
-Ticket creation, assignment, and tracking
-
-User authentication (agents & customers)
-
-REST API backend with Express
-
-Modern frontend UI with React
-
-Easy local development setup
+- Ticket creation and management
+- JWT authentication (user, agent, admin)
+- Knowledge Base (SQLite, simple CRUD)
+- Clean, junior‑friendly code structure
 
 🗂 Project Structure
+
+```
 crossover-helpdesk/
-├── client/ # React frontend
-├── server/ # Express backend
-└── README.md
+├── client/        # React frontend
+└── server/        # Express backend (sqlite3)
+```
 
-🔧 Installation & Setup
+🔧 Quick Start
 
-1. Clone the repo
-   git clone git@github.com:samritbasnet/crossover-helpdesk.git
-   cd crossover-helpdesk
+1) Server
 
-2. Setup server
-   cd server
-   npm install
-   npm run dev # or npm start
+```
+cd server
+npm install
+cp .env.example .env  # if present (or create .env as below)
+npm run dev            # starts at http://localhost:3000
+```
 
-Server runs at http://localhost:5000
+2) Client
 
-3. Setup client
-   cd client
-   npm install
-   npm start
-
-Client runs at http://localhost:3000
-
-⚙️ Available Scripts
-Server (inside /server)
-
-npm run dev → start backend with hot reload (nodemon)
-
-npm start → start backend in production mode
-
-Client (inside /client)
-
-npm start → start React app
-
-npm run build → build for production
+```
+cd client
+npm install
+# optional: create .env and set REACT_APP_API_BASE=http://localhost:3000/api
+npm start             # opens http://localhost:3000 for CRA, or 5173 for Vite
+```
 
 📄 Environment Variables
 
-Create a .env file inside server/:
+Server (`server/.env`):
 
-PORT=5000
-MONGO_URI=your_mongo_connection_string
-JWT_SECRET=your_secret
+```
+PORT=3000
+JWT_SECRET=change-me
+```
+
+Client (`client/.env`):
+
+```
+REACT_APP_API_BASE=http://localhost:3000/api
+```
+
+🛣 API Endpoints (short list)
+
+- Auth: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/verify`
+- Tickets: `GET/POST /api/tickets`, `GET/PUT/DELETE /api/tickets/:id` (requires Bearer token)
+- Knowledge: `GET /api/knowledge`, `GET /api/knowledge/:id`, `POST /api/knowledge/:id/helpful`, `POST/PUT/DELETE /api/knowledge` (protected)
+
+⚙️ Scripts
+
+Server (inside `server/`):
+
+- `npm run dev` → start backend (nodemon)
+- `npm start` → start backend
+
+Client (inside `client/`):
+
+- `npm start` → start React dev server
+- `npm run build` → production build
 
 🛠 Tech Stack
 
-Frontend: React, Axios, Bootstrap/Tailwind (your choice)
+- Frontend: React, Axios, MUI
+- Backend: Node.js, Express, sqlite3
+- Auth: JWT
 
-Backend: Node.js, Express, MongoDB
+✅ Notes
 
-Auth: JWT-based authentication
-
-📌 Future Improvements
-
-Role-based access control (admin, agent, user)
-
-Email notifications
-
-Analytics dashboard
+- The backend uses a single lightweight database (SQLite) and simple helpers (`runQuery/getQuery/getAllQuery`) for clarity.
+- Set `REACT_APP_API_BASE` in `client/.env` to point the client to the server.

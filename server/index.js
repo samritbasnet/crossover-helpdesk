@@ -1,83 +1,128 @@
+// index.js - Complete server setup
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
-const dotenv = require("dotenv");
+const { initializeDatabase } = require("./config/database");
 
-// Load environment variables from .env file
-dotenv.config();
-
-// Create Express app
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Middleware - These run on every request
-app.use(cors()); // Allow frontend to connect from different ports
-app.use(bodyParser.json()); // Parse JSON data from requests
-app.use(bodyParser.urlencoded({ extended: true })); // Parse form data
+// CORS configuration
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://localhost:5173",
+    ], // Added Vite default port
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
 
-// Health check endpoint - Test if server is running
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
+// Basic health check route
 app.get("/", (req, res) => {
   res.json({
-    message: "HelpDesk API Server is running!",
-    version: "1.0.0",
-    status: "active",
+    message: "Crossover Helpdesk Server is running!",
+    status: "healthy",
+    timestamp: new Date().toISOString(),
   });
 });
 
-// Database setup
-const { testConnection, syncDatabase } = require("./config/database");
-require("./models"); // Load all database models
+// Auth routes
+app.use("/api/auth", require("./routes/auth"));
 
-// API Routes - Connect URLs to controller functions
-app.use("/api/auth", require("./routes/auth")); // Authentication endpoints
-app.use("/api/knowledge", require("./routes/knowledge")); // Knowledge base endpoints
-app.use("/api/tickets", require("./routes/tickets")); // Ticket management endpoints
+// Ticket routes
+app.use("/api/tickets", require("./routes/tickets"));
 
-// Error handling middleware - Catches any errors in the application
-app.use((err, req, res, next) => {
-  console.log("Error:", err.message);
-  res.status(500).json({
-    success: false,
-    message: "Something went wrong!",
-    error:
-      process.env.NODE_ENV === "development"
-        ? err.message
-        : "Internal server error",
-  });
+// User routes
+app.use("/api/users", require("./routes/users"));
+
+// Knowledge routes (SQLite-based)
+app.use("/api/knowledge", require("./routes/knowledge"));
+
+// Test route to verify server is working
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working!", timestamp: new Date().toISOString() });
 });
 
-// 404 handler - When someone tries to access a route that doesn't exist
-app.use((req, res) => {
+// 404 handler
+app.use((req, res, next) => {
   res.status(404).json({
     success: false,
-    message: "API endpoint not found",
-    path: req.originalUrl,
+    message: `Route ${req.originalUrl} not found`,
   });
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error("Server error:", error);
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    error: process.env.NODE_ENV === "development" ? error.message : undefined,
+  });
+});
+
+// Start server function
 const startServer = async () => {
   try {
-    // Step 1: Test database connection
-    await testConnection();
+    // Initialize database first
+    await initializeDatabase();
 
-    // Step 2: Create/update database tables
-    await syncDatabase();
-
-    // Step 3: Start listening for requests
-    app.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}`);
-      console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
-      console.log(`🎫 Ticket endpoints: http://localhost:${PORT}/api/tickets`);
+    // Start the server
+    const server = app.listen(PORT, () => {
+      console.log(`✅ Server is running on http://localhost:${PORT}`);
       console.log(
-        `📚 Knowledge endpoints: http://localhost:${PORT}/api/knowledge`
+        `✅ CORS enabled for: http://localhost:3000, http://localhost:5173`
       );
+      console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
+    });
+
+    // Handle server errors
+    server.on("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        console.error(`❌ Port ${PORT} is already in use`);
+        process.exit(1);
+      } else {
+        console.error("❌ Server error:", error);
+        process.exit(1);
+      }
     });
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    console.error("❌ Failed to start server:", error.message);
+    process.exit(1);
   }
 };
 
-// Start the server
+// Graceful shutdown
+const gracefulShutdown = () => {
+  console.log("🔄 Shutting down server gracefully...");
+  process.exit(0);
+};
+
+process.on("SIGINT", gracefulShutdown);
+process.on("SIGTERM", gracefulShutdown);
+
+// Handle unhandled promise rejections
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+  process.exit(1);
+});
+
 startServer();

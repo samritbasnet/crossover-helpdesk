@@ -11,6 +11,7 @@ import {
 import UpdateTicket from "./components/Agent/UpdateTicket";
 import Login from "./components/Auth/Login";
 import Signup from "./components/Auth/Signup";
+import Loading from "./components/common/Loading";
 import ArticleDetail from "./components/Knowledge/ArticleDetail";
 import Navbar from "./components/Layout/Navbar";
 import CreateTicket from "./components/Tickets/CreateTicket";
@@ -20,6 +21,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import AgentDashboard from "./pages/AgentDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import UserDashboard from "./pages/UserDashboard";
+import { USER_ROLES } from "./utils/constants";
 
 // Create Material-UI theme
 const theme = createTheme({
@@ -38,7 +40,7 @@ const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <Loading message="Checking authentication..." />;
   }
 
   return user ? children : <Navigate to="/login" />;
@@ -49,14 +51,14 @@ const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <Loading message="Checking authentication..." />;
   }
 
-  return user ? (
-    <Navigate to={user.role === "agent" ? "/agent-dashboard" : "/dashboard"} />
-  ) : (
-    children
-  );
+  const dashboardRoute = user?.role === USER_ROLES.AGENT || user?.role === USER_ROLES.ADMIN 
+    ? "/agent-dashboard" 
+    : "/dashboard";
+
+  return user ? <Navigate to={dashboardRoute} /> : children;
 };
 
 // Main App Routes
