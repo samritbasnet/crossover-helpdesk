@@ -43,6 +43,7 @@ const UpdateTicket = () => {
   // Load ticket details
   useEffect(() => {
     loadTicket();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadTicket = async () => {

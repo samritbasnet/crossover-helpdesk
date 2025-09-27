@@ -18,18 +18,13 @@ import { useAuth } from "../../context/AuthContext";
 import { ticketsAPI } from "../../services/api";
 
 const TicketDetails = () => {
-  const { user, isAgent } = useAuth();
+  const { isAgent } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
 
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Load ticket details
-  useEffect(() => {
-    loadTicket();
-  }, [id]);
 
   const loadTicket = async () => {
     try {
@@ -45,6 +40,12 @@ const TicketDetails = () => {
       setLoading(false);
     }
   };
+
+  // Load ticket details
+  useEffect(() => {
+    loadTicket();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // Get status color
   const getStatusColor = (status) => {

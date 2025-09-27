@@ -1,7 +1,7 @@
 # Netlify configuration for React frontend
 [build]
   base = "client"
-  publish = "client/build"
+  publish = "build"
   command = "CI=false npm run build"
 
 [build.environment]
