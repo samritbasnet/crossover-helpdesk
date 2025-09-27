@@ -389,26 +389,18 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Check permissions - Debug logging
-    console.log("=== PERMISSION DEBUG ===");
-    console.log("User Role:", userRole);
-    console.log("User ID from JWT:", userId, typeof userId);
-    console.log("Ticket User ID:", ticket.user_id, typeof ticket.user_id);
-    console.log("Ticket Assigned To:", ticket.assigned_to, typeof ticket.assigned_to);
-    console.log("parseInt(userId):", parseInt(userId));
-    console.log("Comparison 1 (admin):", userRole === "admin");
-    console.log("Comparison 2 (owner):", ticket.user_id === parseInt(userId));
-    console.log("Comparison 3 (assigned):", ticket.assigned_to === parseInt(userId));
+    // Check permissions - Fixed logic
+    const userIdNum = parseInt(userId);
+    const ticketUserId = parseInt(ticket.user_id);
+    const assignedToId = ticket.assigned_to ? parseInt(ticket.assigned_to) : null;
     
     const canEdit =
       userRole === "admin" ||
-      ticket.user_id === parseInt(userId) ||
-      ticket.assigned_to === parseInt(userId);
-    
-    console.log("Final canEdit result:", canEdit);
-    console.log("========================");
+      ticketUserId === userIdNum ||
+      (assignedToId && assignedToId === userIdNum);
 
     if (!canEdit) {
+      console.log(`Permission denied for user ${userId} (${userRole}) trying to edit ticket ${ticketId} owned by ${ticket.user_id}`);
       return res.status(403).json({
         success: false,
         message: "Access denied. You can only edit your own tickets.",

@@ -1,10 +1,8 @@
 // Edit Ticket Component - For users to edit their own tickets
 import { ArrowBack, Save } from "@mui/icons-material";
 import {
-  Alert,
   Box,
   Button,
-  CircularProgress,
   Container,
   FormControl,
   Grid,
@@ -17,93 +15,89 @@ import {
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import ErrorMessage from "../common/ErrorMessage";
+import Loading from "../common/Loading";
 import { useAuth } from "../../context/AuthContext";
 import { ticketsAPI } from "../../services/api";
+import { getErrorMessage } from "../../utils/helpers";
+import { TICKET_PRIORITY, TICKET_STATUS } from "../../utils/constants";
 
 const EditTicket = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // State for ticket data
+  // State management
   const [ticket, setTicket] = useState(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    priority: TICKET_PRIORITY.MEDIUM,
+    status: TICKET_STATUS.OPEN,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // State for form data
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    priority: "medium",
-  });
-
-  // Load ticket details
+  // Load ticket data
   useEffect(() => {
-    loadTicket();
+    const loadTicket = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        
+        const response = await ticketsAPI.getTicket(id);
+        
+        if (response.success && response.ticket) {
+          const ticketData = response.ticket;
+          setTicket(ticketData);
+          setFormData({
+            title: ticketData.title || "",
+            description: ticketData.description || "",
+            priority: ticketData.priority || TICKET_PRIORITY.MEDIUM,
+            status: ticketData.status || TICKET_STATUS.OPEN,
+          });
+        } else {
+          setError("Failed to load ticket data");
+        }
+      } catch (err) {
+        console.error("Error loading ticket:", err);
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadTicket();
+    }
   }, [id]);
 
-  const loadTicket = async () => {
-    try {
-      setLoading(true);
-      const response = await ticketsAPI.getTicket(id);
-      // Handle the response structure from our backend
-      // Backend returns: { success: true, ticket: {...} }
-      const ticketData = response.ticket;
-
-      // Check if user owns this ticket
-      if (ticketData.userId !== user?.id) {
-        setError("You can only edit your own tickets");
-        return;
-      }
-
-      // Check if ticket can be edited (only open tickets)
-      if (ticketData.status !== "open") {
-        setError("You can only edit open tickets");
-        return;
-      }
-
-      setTicket(ticketData);
-      setFormData({
-        title: ticketData.title,
-        description: ticketData.description,
-        priority: ticketData.priority,
-      });
-    } catch (err) {
-      console.error("Load ticket error:", err);
-      setError("Failed to load ticket details");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle input changes
+  // Handle form input changes
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    // Clear messages when user makes changes
-    if (error) setError("");
-    if (success) setSuccess("");
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  // Validate form
+  // Form validation
   const validateForm = () => {
     if (!formData.title.trim()) {
       setError("Title is required");
       return false;
     }
-    if (formData.title.length < 5) {
-      setError("Title must be at least 5 characters long");
+    if (formData.title.trim().length < 3) {
+      setError("Title must be at least 3 characters long");
       return false;
     }
     if (!formData.description.trim()) {
       setError("Description is required");
       return false;
     }
-    if (formData.description.length < 10) {
+    if (formData.description.trim().length < 10) {
       setError("Description must be at least 10 characters long");
       return false;
     }
@@ -113,29 +107,30 @@ const EditTicket = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    setError("");
-    setSuccess("");
-
+    
     if (!validateForm()) {
-      setSaving(false);
       return;
     }
 
     try {
-      const result = await ticketsAPI.updateTicket(id, formData);
+      setSaving(true);
+      setError("");
+      setSuccess("");
 
-      if (result.success) {
+      const response = await ticketsAPI.updateTicket(id, formData);
+
+      if (response.success) {
         setSuccess("Ticket updated successfully!");
-        // Redirect to ticket details after 2 seconds
+        // Redirect after 2 seconds
         setTimeout(() => {
           navigate(`/ticket/${id}`);
         }, 2000);
       } else {
-        setError(result.message || "Failed to update ticket");
+        setError(response.message || "Failed to update ticket");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "An unexpected error occurred");
+      console.error("Error updating ticket:", err);
+      setError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -146,61 +141,36 @@ const EditTicket = () => {
     navigate(`/ticket/${id}`);
   };
 
+  // Show loading state
   if (loading) {
+    return <Loading message="Loading ticket..." />;
+  }
+
+  // Show error if ticket not found
+  if (!ticket) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-        <Box
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          minHeight="400px"
-        >
-          <CircularProgress />
+      <Container maxWidth="md">
+        <Box sx={{ mt: 4 }}>
+          <ErrorMessage 
+            error="Ticket not found or you don't have permission to edit it"
+            title="Access Denied"
+          />
+          <Box sx={{ mt: 2 }}>
+            <Button
+              startIcon={<ArrowBack />}
+              onClick={() => navigate("/dashboard")}
+            >
+              Back to Dashboard
+            </Button>
+          </Box>
         </Box>
       </Container>
     );
   }
 
-  if (error && !ticket) {
-    return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error">{error}</Alert>
-        <Button
-          startIcon={<ArrowBack />}
-          onClick={() => navigate("/dashboard")}
-          sx={{ mt: 2 }}
-        >
-          Back to Dashboard
-        </Button>
-      </Container>
-    );
-  }
-
-  if (!ticket) {
-    return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="warning">Ticket not found</Alert>
-        <Button
-          startIcon={<ArrowBack />}
-          onClick={() => navigate("/dashboard")}
-          sx={{ mt: 2 }}
-        >
-          Back to Dashboard
-        </Button>
-      </Container>
-    );
-  }
-
   return (
-    <Container component="main" maxWidth="md">
-      <Box
-        sx={{
-          marginTop: 4,
-          marginBottom: 4,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+    <Container maxWidth="md">
+      <Box sx={{ mt: 4, mb: 4 }}>
         {/* Header */}
         <Box display="flex" alignItems="center" mb={3}>
           <Button
@@ -211,28 +181,26 @@ const EditTicket = () => {
             Back to Ticket
           </Button>
           <Typography variant="h4" component="h1">
-            Edit Ticket #{ticket.id}
+            Edit Ticket #{id}
           </Typography>
         </Box>
 
-        <Paper elevation={3} sx={{ padding: 4 }}>
+        <Paper elevation={3} sx={{ p: 4 }}>
           <Typography variant="h6" gutterBottom color="text.secondary">
-            Update your support request details
+            Update your ticket information below.
           </Typography>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-
+          <ErrorMessage error={error} />
+          
           {success && (
-            <Alert severity="success" sx={{ mb: 3 }}>
-              {success}
-            </Alert>
+            <ErrorMessage 
+              error={success}
+              severity="success"
+              title="Success"
+            />
           )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
             <Grid container spacing={3}>
               {/* Title Field */}
               <Grid item xs={12}>
@@ -245,8 +213,8 @@ const EditTicket = () => {
                   value={formData.title}
                   onChange={handleChange}
                   disabled={saving}
-                  helperText="Brief description of your issue (5-200 characters)"
-                  inputProps={{ maxLength: 200 }}
+                  helperText="Brief description of your issue (3-100 characters)"
+                  inputProps={{ maxLength: 100 }}
                 />
               </Grid>
 
@@ -262,7 +230,7 @@ const EditTicket = () => {
                     label="Priority"
                     onChange={handleChange}
                   >
-                    <MenuItem value="low">
+                    <MenuItem value={TICKET_PRIORITY.LOW}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -276,7 +244,7 @@ const EditTicket = () => {
                         Low - General questions
                       </Box>
                     </MenuItem>
-                    <MenuItem value="medium">
+                    <MenuItem value={TICKET_PRIORITY.MEDIUM}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -290,7 +258,7 @@ const EditTicket = () => {
                         Medium - Minor issues
                       </Box>
                     </MenuItem>
-                    <MenuItem value="high">
+                    <MenuItem value={TICKET_PRIORITY.HIGH}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -304,7 +272,7 @@ const EditTicket = () => {
                         High - Important issues
                       </Box>
                     </MenuItem>
-                    <MenuItem value="urgent">
+                    <MenuItem value={TICKET_PRIORITY.URGENT}>
                       <Box display="flex" alignItems="center">
                         <Box
                           sx={{
@@ -322,14 +290,34 @@ const EditTicket = () => {
                 </FormControl>
               </Grid>
 
-              {/* User Info (Read-only) */}
+              {/* Status Field */}
               <Grid item xs={12} sm={6}>
+                <FormControl fullWidth disabled={saving}>
+                  <InputLabel id="status-label">Status</InputLabel>
+                  <Select
+                    labelId="status-label"
+                    id="status"
+                    name="status"
+                    value={formData.status}
+                    label="Status"
+                    onChange={handleChange}
+                  >
+                    <MenuItem value={TICKET_STATUS.OPEN}>Open</MenuItem>
+                    <MenuItem value={TICKET_STATUS.IN_PROGRESS}>In Progress</MenuItem>
+                    <MenuItem value={TICKET_STATUS.RESOLVED}>Resolved</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Submitted By Field (Read-only) */}
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
+                  id="submittedBy"
                   label="Submitted by"
-                  value={user?.name || ""}
+                  value={ticket.user_name || user?.name || ""}
                   disabled
-                  helperText="Your name (automatically filled)"
+                  helperText="Ticket creator (cannot be changed)"
                 />
               </Grid>
 
@@ -346,7 +334,7 @@ const EditTicket = () => {
                   value={formData.description}
                   onChange={handleChange}
                   disabled={saving}
-                  helperText="Detailed description of your issue (10-2000 characters). Include steps to reproduce, error messages, and any relevant information."
+                  helperText="Detailed description of your issue (10-2000 characters)"
                   inputProps={{ maxLength: 2000 }}
                 />
               </Grid>
@@ -372,7 +360,7 @@ const EditTicket = () => {
               <Button
                 type="submit"
                 variant="contained"
-                startIcon={saving ? <CircularProgress size={20} /> : <Save />}
+                startIcon={saving ? null : <Save />}
                 disabled={saving}
                 size="large"
               >
@@ -385,25 +373,13 @@ const EditTicket = () => {
         {/* Help Text */}
         <Paper
           elevation={1}
-          sx={{ padding: 3, mt: 3, backgroundColor: "warning.50" }}
+          sx={{ p: 3, mt: 3, backgroundColor: "grey.50" }}
         >
-          <Typography variant="h6" gutterBottom>
-            ⚠️ Important Notes:
+          <Typography variant="body2" color="text.secondary">
+            <strong>Need help?</strong> You can update the title, description, 
+            and priority of your ticket. If you need to change the status to 
+            "Closed", please contact support or wait for an agent to resolve your issue.
           </Typography>
-          <Box component="ul" sx={{ pl: 2, m: 0 }}>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
-              You can only edit tickets that are still "Open"
-            </Typography>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
-              Once an agent starts working on your ticket, editing is disabled
-            </Typography>
-            <Typography component="li" variant="body2" sx={{ mb: 1 }}>
-              Make sure to provide clear and detailed information
-            </Typography>
-            <Typography component="li" variant="body2">
-              Changes will be visible to support agents immediately
-            </Typography>
-          </Box>
         </Paper>
       </Box>
     </Container>
