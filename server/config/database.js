@@ -84,7 +84,7 @@ const createTables = () => {
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         name TEXT NOT NULL,
-        role TEXT DEFAULT 'user' CHECK(role IN ('user', 'agent', 'admin')),
+        role TEXT DEFAULT 'user',
         email_notifications TEXT DEFAULT 'all' CHECK(email_notifications IN ('all', 'important', 'none')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
