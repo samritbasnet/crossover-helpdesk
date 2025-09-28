@@ -51,7 +51,7 @@ router.post("/register", async (req, res) => {
 
     // Validate role
     const validRoles = ["user", "agent", "admin"];
-    if (!validRoles.includes(role)) {
+    if (role && !validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
         message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
@@ -83,14 +83,15 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
+    const userRole = role || "user";
     const result = await runQuery(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-      [name, email, hashedPassword, role]
+      [name, email, hashedPassword, userRole]
     );
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: result.id, email, role },
+      { userId: result.id, email, role: userRole },
       process.env.JWT_SECRET || "fallback-secret-key-for-development-only",
       { expiresIn: "24h" }
     );
