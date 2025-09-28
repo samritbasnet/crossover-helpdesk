@@ -45,8 +45,20 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
+      // Clear any existing state before login attempt
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
       const response = await authAPI.login(credentials);
-      const { token: newToken, user: userData } = response; // Fixed: response instead of response.data
+      console.log('Login response:', response);
+
+      const { token: newToken, user: userData } = response;
+
+      if (!newToken || !userData) {
+        throw new Error('Invalid response from server');
+      }
 
       localStorage.setItem("token", newToken);
       localStorage.setItem("user", JSON.stringify(userData));
@@ -56,9 +68,16 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true };
     } catch (error) {
+      console.error('Login error:', error);
+      // Clear any partial state on error
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
       return {
         success: false,
-        message: error.response?.data?.message || "Login failed",
+        message: error.response?.data?.message || error.message || "Login failed",
       };
     }
   };
@@ -84,10 +103,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('Logging out user...');
+
+    // Clear localStorage
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
+    // Clear state
     setToken(null);
     setUser(null);
+
+    // Force redirect to login page
+    window.location.href = "/login?session_expired=true";
   };
 
   const isAgent = () => user?.role === "agent";

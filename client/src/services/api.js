@@ -109,13 +109,12 @@ api.interceptors.response.use(
 
     // Handle specific error statuses
     if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
       switch (error.response.status) {
         case 401: // Unauthorized
           localStorage.removeItem("token");
-          // Only redirect if not on login page
-          if (!window.location.pathname.includes('/login')) {
+          // Only redirect if not on login page and not already redirecting
+          if (!window.location.pathname.includes('/login') &&
+              !window.location.search.includes('session_expired=true')) {
             window.location.href = "/login?session_expired=true";
           }
           break;
