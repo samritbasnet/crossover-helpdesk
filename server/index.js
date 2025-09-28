@@ -7,9 +7,9 @@ const { initializeDatabase } = require("./config/database");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS configuration - Simplified for production
-const corsOptions = {
-  origin: [
+// CORS configuration - Explicit headers
+app.use((req, res, next) => {
+  const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3000',
@@ -17,19 +17,26 @@ const corsOptions = {
     'http://localhost:5173',
     'https://crossover-ticket.netlify.app',
     'https://crossover-helpdesk.onrender.com'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-
-// Enable CORS for all routes
-app.use(cors(corsOptions));
-
-// Handle preflight requests
-app.options('*', cors(corsOptions));
+  ];
+  
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Middleware
 app.use(express.json());
