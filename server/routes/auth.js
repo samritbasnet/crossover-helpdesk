@@ -49,22 +49,22 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Validate role (temporarily disabled for debugging)
-    // const validRoles = ["user", "agent", "admin"];
-    // if (role && !validRoles.includes(role)) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
-    //   });
-    // }
+    // Validate role
+    const validRoles = ["user", "agent", "admin"];
+    if (role && !validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
+      });
+    }
 
     // Additional validation for agent role (optional - remove if not needed)
-    // if (role === "agent" && name.toLowerCase().includes("admin")) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Cannot create agent account with 'admin' in name",
-    //   });
-    // }
+    if (role === "agent" && name.toLowerCase().includes("admin")) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot create agent account with 'admin' in name",
+      });
+    }
 
     // Check if user already exists (case-insensitive)
     const existingUser = await getQuery(
@@ -80,23 +80,19 @@ router.post("/register", async (req, res) => {
     }
 
     // Hash password
-    console.log("Attempting to hash password for:", email);
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log("Password hashed successfully");
 
     // Create user
-    console.log("Attempting to create user with role:", role);
     const finalRole = role || "user";
     const result = await runQuery(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
       [name, email, hashedPassword, finalRole]
     );
-    console.log("User created successfully with ID:", result.id);
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: result.id, email, role: finalRole },
-      process.env.JWT_SECRET || "fallback-secret-key-for-development-only",
+      "your-secret-key-change-this-in-production",
       { expiresIn: "24h" }
     );
 
@@ -161,7 +157,7 @@ router.post("/login", async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || "fallback-secret-key-for-development-only",
+      "your-secret-key-change-this-in-production",
       { expiresIn: "24h" }
     );
 
@@ -197,7 +193,7 @@ router.get("/verify", async (req, res) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "fallback-secret-key-for-development-only");
+    const decoded = jwt.verify(token, "your-secret-key-change-this-in-production");
 
     // Get fresh user data
     const user = await getQuery(
