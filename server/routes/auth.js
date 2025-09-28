@@ -80,14 +80,18 @@ router.post("/register", async (req, res) => {
     }
 
     // Hash password
+    console.log("Attempting to hash password for:", email);
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("Password hashed successfully");
 
     // Create user
+    console.log("Attempting to create user with role:", role);
     const finalRole = role || "user";
     const result = await runQuery(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
       [name, email, hashedPassword, finalRole]
     );
+    console.log("User created successfully with ID:", result.id);
 
     // Generate JWT token
     const token = jwt.sign(
