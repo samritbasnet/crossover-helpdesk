@@ -14,37 +14,23 @@ const userRoutes = require("./routes/users");
 const PORT = process.env.PORT || 3000;
 const app = express();
 
-const allowedOrigins = [
-  'https://crossover-ticket.netlify.app',
-  'http://localhost:3000',
-  'http://localhost:3001'
-];
-
+// For development, allow all origins
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin && process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-
-    // In production, only allow specific origins
-    if (process.env.NODE_ENV === 'production') {
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'));
-    }
-
-    // In development, allow all origins with logging
-    console.log(`Allowing request from: ${origin}`);
-    return callback(null, true);
-  },
+  origin: true, // Reflect the request origin
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   optionsSuccessStatus: 200
 };
+
+// Log CORS requests in development
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} from ${req.headers.origin || 'unknown origin'}`);
+    next();
+  });
+}
 
 // Apply CORS with the above options
 app.use(cors(corsOptions));
@@ -138,7 +124,7 @@ const startServer = async () => {
       }
     });
   } catch (error) {
-    console.error("❌ Failed to start server:", error.message);
+    console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 };

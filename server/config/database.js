@@ -76,8 +76,27 @@ const initializeDatabase = () => {
   });
 };
 // Create all database tables
-const createTables = () => {
+const createTables = async () => {
   return new Promise((resolve, reject) => {
+    // In development, drop tables if they exist
+    const dropTables = `
+      DROP TABLE IF EXISTS users;
+      DROP TABLE IF EXISTS tickets;
+      DROP TABLE IF EXISTS knowledge_base;
+    `;
+    // Execute drop tables in development
+    if (process.env.NODE_ENV !== 'production') {
+      db.serialize(() => {
+        db.exec(dropTables, (err) => {
+          if (err) {
+            console.warn('Warning: Could not drop tables:', err.message);
+          } else {
+            console.log('Dropped existing tables for fresh start');
+          }
+        });
+      });
+    }
+
     // Users table with all necessary fields
     const usersTable = `
       CREATE TABLE IF NOT EXISTS users (
@@ -86,8 +105,10 @@ const createTables = () => {
         password TEXT NOT NULL,
         name TEXT NOT NULL,
         role TEXT DEFAULT 'user' CHECK(role IN ('user', 'agent', 'admin')),
+        email_verified BOOLEAN DEFAULT 0,
         email_notifications TEXT DEFAULT 'all',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
 
@@ -136,6 +157,14 @@ const createTables = () => {
         FOREIGN KEY (created_by) REFERENCES users (id)
       )
     `;
+
+    // Error handler for database operations
+    const handleError = (tableName) => (err) => {
+      if (err) {
+        console.error(`❌ Error creating ${tableName}:`, err.message);
+        throw err;
+      }
+    };
 
     // Create tables in sequence
     db.serialize(() => {

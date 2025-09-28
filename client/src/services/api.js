@@ -3,15 +3,22 @@ import axios from "axios";
 
 // API configuration - determines base URL based on environment
 const getApiConfig = () => {
-  // In production, use relative path for Netlify proxy
-  if (process.env.NODE_ENV === 'production') {
-    console.log('Production mode - using Netlify proxy');
-    return { baseURL: '/api' };
+  // Always use the environment variable if set
+  if (process.env.REACT_APP_API_BASE) {
+    console.log('Using REACT_APP_API_BASE:', process.env.REACT_APP_API_BASE);
+    return { 
+      baseURL: process.env.REACT_APP_API_BASE,
+      withCredentials: true
+    };
   }
 
-  // In development, use local server
-  console.log('Development mode - using local server');
-  return { baseURL: process.env.REACT_APP_API_BASE || 'http://localhost:3000/api' };
+  // Default to local development server
+  const baseURL = 'http://localhost:3000/api';
+  console.log('Development mode - using:', baseURL);
+  return { 
+    baseURL,
+    withCredentials: true
+  };
 };
 
 // Create axios instance with configuration

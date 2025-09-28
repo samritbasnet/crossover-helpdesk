@@ -7,7 +7,7 @@ const { getDatabase } = require("../config/database");
 const router = express.Router();
 
 // JWT Secret (in production, use environment variable)
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
+const JWT_SECRET = process.env.JWT_SECRET || "558c0827173df93a270c9f55ed776d6a";
 
 // Helper function to run database queries
 const runQuery = (query, params = []) => {
