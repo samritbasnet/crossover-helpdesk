@@ -5,6 +5,55 @@ const path = require("path");
 const dbPath = path.join(__dirname, "..", "helpdesk.db");
 let db = null;
 
+// Helper function to run database queries
+const runQuery = (query, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = getDatabase();
+    db.run(query, params, function (err) {
+      if (err) {
+        console.error("Database runQuery error:", err.message);
+        console.error("Query:", query);
+        console.error("Params:", params);
+        reject(err);
+      } else {
+        resolve({ id: this.lastID, changes: this.changes });
+      }
+    });
+  });
+};
+
+const getQuery = (query, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = getDatabase();
+    db.get(query, params, (err, row) => {
+      if (err) {
+        console.error("Database getQuery error:", err.message);
+        console.error("Query:", query);
+        console.error("Params:", params);
+        reject(err);
+      } else {
+        resolve(row);
+      }
+    });
+  });
+};
+
+const getAllQuery = (query, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = getDatabase();
+    db.all(query, params, (err, rows) => {
+      if (err) {
+        console.error("Database getAllQuery error:", err.message);
+        console.error("Query:", query);
+        console.error("Params:", params);
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+};
+
 // Initialize database connection
 const initializeDatabase = () => {
   return new Promise((resolve, reject) => {
@@ -140,4 +189,7 @@ module.exports = {
   initializeDatabase,
   getDatabase,
   closeDatabase,
+  runQuery,
+  getQuery,
+  getAllQuery,
 };
