@@ -86,7 +86,9 @@ const Signup = () => {
       if (result.success) {
         // Redirect based on user role
         navigate(
-          signupData.role === "admin" ? "/admin-dashboard" : "/dashboard"
+          signupData.role === "admin" ? "/admin-dashboard" :
+          signupData.role === "agent" ? "/agent-dashboard" :
+          "/dashboard"
         );
       } else {
         setError(result.message || "Signup failed. Please try again.");
@@ -167,6 +169,9 @@ const Signup = () => {
                 onChange={handleChange}
               >
                 <MenuItem value="user">User (Submit tickets)</MenuItem>
+                <MenuItem value="agent">
+                  Support Agent (Resolve tickets)
+                </MenuItem>
                 <MenuItem value="admin">
                   Admin (Manage all tickets)
                 </MenuItem>

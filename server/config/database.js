@@ -75,19 +75,17 @@ const initializeDatabase = () => {
     });
   });
 };
-
 // Create all database tables
 const createTables = () => {
   return new Promise((resolve, reject) => {
     // Users table with all necessary fields
     const usersTable = `
-      DROP TABLE IF EXISTS users;
-      CREATE TABLE users (
+      CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         name TEXT NOT NULL,
-        role TEXT DEFAULT 'user',
+        role TEXT DEFAULT 'user' CHECK(role IN ('user', 'agent', 'admin')),
         email_notifications TEXT DEFAULT 'all',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -150,20 +148,58 @@ const createTables = () => {
           reject(err);
         } else {
           console.log("✅ Knowledge table created/verified");
-          resolve();
+          // Create default admin user
+          createDefaultAdmin().then(() => {
+            resolve();
+          }).catch(reject);
         }
       });
     });
   });
 };
 
-// Simple error handler for table creation
-const handleError = (tableName) => (err) => {
-  if (err) {
-    console.error(`❌ Error creating ${tableName}:`, err.message);
-  } else {
-    console.log(`✅ ${tableName} created/verified`);
-  }
+// Create default admin user
+const createDefaultAdmin = () => {
+  return new Promise((resolve, reject) => {
+    // Check if admin already exists
+    db.get("SELECT id FROM users WHERE email = ?", ["admin@helpdesk.com"], (err, row) => {
+      if (err) {
+        console.error("Error checking for existing admin:", err.message);
+        reject(err);
+        return;
+      }
+
+      if (row) {
+        console.log("✅ Default admin user already exists");
+        resolve();
+        return;
+      }
+
+      // Create default admin user
+      const bcrypt = require("bcrypt");
+      bcrypt.hash("admin", 10, (err, hashedPassword) => {
+        if (err) {
+          console.error("Error hashing admin password:", err.message);
+          reject(err);
+          return;
+        }
+
+        db.run(
+          "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
+          ["System Admin", "admin@helpdesk.com", hashedPassword, "admin"],
+          function(err) {
+            if (err) {
+              console.error("Error creating default admin:", err.message);
+              reject(err);
+            } else {
+              console.log("✅ Default admin user created with ID:", this.lastID);
+              resolve();
+            }
+          }
+        );
+      });
+    });
+  });
 };
 
 // Get database instance

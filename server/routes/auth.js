@@ -50,11 +50,12 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Validate role - only user and admin allowed
-    if (!["user", "admin"].includes(role)) {
+    // Validate role
+    const validRoles = ["user", "agent", "admin"];
+    if (role && !validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid role. Must be 'user' or 'admin'",
+        message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
       });
     }
 

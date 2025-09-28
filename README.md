@@ -86,13 +86,16 @@ Client (inside `client/`):
 
 🛠 Tech Stack
 
-- Frontend: React, Axios, MUI
-- Backend: Node.js, Express, sqlite3
-- Auth: JWT
+- **Frontend**: React, Material-UI, Axios, React Router
+- **Backend**: Node.js, Express.js, SQLite3, JWT
+- **Email**: Nodemailer (Gmail/SendGrid support)
+- **Deployment**: Netlify (Frontend) + Render (Backend)
+- **Database**: SQLite with custom query helpers
 
 📚 Documentation
 
 - **API Documentation**: See [API.md](./API.md) for complete endpoint documentation
+- **Email Setup**: See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for email notification configuration
 - **Environment Setup**: Use `.env.example` files as templates
 - **Database**: SQLite database created automatically on first run
 
@@ -141,7 +144,9 @@ docker-compose up --build
 - **Authentication**: JWT-based with role management (user/agent/admin)
 - **Ticket Management**: Full CRUD with status tracking and assignment
 - **Knowledge Base**: Self-service articles with search and voting
+- **Email Notifications**: Beautiful HTML emails for ticket updates with user preferences
 - **User Management**: Profile management and role-based permissions
+- **Settings Dashboard**: Email preferences and account management
 - **Responsive Design**: Works on desktop, tablet, and mobile
 - **Error Handling**: Comprehensive error states and network error recovery
 - **Professional UI**: Material-UI components with consistent theming
