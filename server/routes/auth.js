@@ -35,7 +35,6 @@ const getQuery = (query, params = []) => {
     });
   });
 };
-
 // Register endpoint
 router.post("/register", async (req, res) => {
   try {
@@ -44,10 +43,10 @@ router.post("/register", async (req, res) => {
 
     const { name, email, password, role = "user" } = req.body;
 
-    // Validation
+    // Input validation
     console.log("Validating input fields...");
     if (!name || !email || !password) {
-      console.log("Validation failed: missing required fields");
+      console.log("Input validation failed: missing required fields");
       return res.status(400).json({
         success: false,
         message: "Name, email, and password are required",
@@ -90,27 +89,26 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log("Password hashed successfully");
 
-    // Create user (workaround for agent role issue)
-    const finalRole = (role === "agent") ? "user" : (role || "user");
-    console.log(`Creating user with temporary role: ${finalRole}`);
+    // Create user (try without role first for debugging)
+    console.log("Attempting user creation without role...");
     const result = await runQuery(
-      "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-      [name, email, hashedPassword, finalRole]
+      "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+      [name, email, hashedPassword]
     );
     console.log(`User created successfully with ID: ${result.id}`);
 
-    // If original role was agent, update it after creation
-    if (role === "agent" && result.id) {
-      console.log("Updating user role to agent...");
+    // Update role after creation
+    if (role && role !== "user") {
+      console.log(`Updating user role to: ${role}`);
       await runQuery(
-        "UPDATE users SET role = 'agent' WHERE id = ?",
-        [result.id]
+        "UPDATE users SET role = ? WHERE id = ?",
+        [role, result.id]
       );
-      console.log("User role updated to agent successfully");
+      console.log(`User role updated to ${role} successfully`);
     }
 
     // Generate JWT token (use the correct final role)
-    const actualRole = role === "agent" ? "agent" : finalRole;
+    const actualRole = role || "user";
     console.log("Generating JWT token with role:", actualRole);
     const token = jwt.sign(
       { userId: result.id, email, role: actualRole },
