@@ -1,17 +1,31 @@
 // services/emailService.js - Email notification service
 const nodemailer = require('nodemailer');
 
+// Check if email is configured
+const isEmailConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+
 // Email configuration
 const createTransporter = () => {
-  // For Gmail (you can also use SendGrid, Mailgun, etc.)
-  return nodemailer.createTransporter({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER, // Your Gmail address
-      pass: process.env.EMAIL_PASS  // Your Gmail app password
-    }
-  });
+  if (!isEmailConfigured) {
+    console.warn('Email service not configured. Set EMAIL_USER and EMAIL_PASS in .env to enable email notifications.');
+    return null;
+  }
+  
+  try {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+  } catch (error) {
+    console.error('Failed to create email transporter:', error.message);
+    return null;
+  }
 };
+
+const transporter = createTransporter();
 
 // Email templates
 const emailTemplates = {
@@ -144,23 +158,20 @@ const shouldSendEmail = (userPreference, emailType) => {
 
 // Main email sending functions
 const sendEmail = async (to, subject, html, emailType = 'general', userPreference = 'all') => {
+  if (!isEmailConfigured) {
+    console.warn('Email service not configured. Email not sent to:', to);
+    return { success: false, message: 'Email service not configured' };
+  }
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.error('Email transporter not initialized');
+    return { success: false, message: 'Email service not available' };
+  }
+
   try {
-    // Check user preferences first
-    if (!shouldSendEmail(userPreference, emailType)) {
-      console.log(`📧 Email skipped due to user preference (${userPreference}) for ${emailType} to:`, to);
-      return { success: true, message: 'Email skipped due to user preference' };
-    }
-
-    // Skip sending emails if not configured
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('📧 Email not configured, skipping notification to:', to);
-      console.log('Subject:', subject);
-      return { success: true, message: 'Email service not configured' };
-    }
-
-    const transporter = createTransporter();
-    
     const mailOptions = {
+      from: `"Helpdesk System" <${process.env.EMAIL_USER}>`,
       from: `"Crossover Helpdesk" <${process.env.EMAIL_USER}>`,
       to,
       subject,

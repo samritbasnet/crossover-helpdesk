@@ -29,18 +29,45 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error',
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtError) {
+      console.error('JWT verification failed:', jwtError.message);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token. Please log in again.',
+        error: jwtError.message
+      });
+    }
 
     // Check if user still exists in database
-    const user = await dbQuery(
-      "SELECT id, name, email, role FROM users WHERE id = ?",
-      [decoded.userId]
-    );
+    let user;
+    try {
+      user = await dbQuery(
+        'SELECT id, name, email, role FROM users WHERE id = ?',
+        [decoded.userId]
+      );
+    } catch (dbError) {
+      console.error('Database error during auth:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error verifying user account',
+      });
+    }
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "User account not found.",
+        message: 'User account not found. Please log in again.',
       });
     }
 

@@ -38,8 +38,6 @@ const getQuery = (query, params = []) => {
 // Register endpoint
 router.post("/register", async (req, res) => {
   try {
-    console.log("=== SIGNUP REQUEST START ===");
-
     const { name, email, password, role = "user" } = req.body;
 
     // Input validation
@@ -77,7 +75,7 @@ router.post("/register", async (req, res) => {
 
     // Create user
     const result = await runQuery(
-      "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
+      "INSERT INTO users (name, email, password, role, email_verified) VALUES (?, ?, ?, ?, 1)",
       [name, email, hashedPassword, role]
     );
 
@@ -97,6 +95,7 @@ router.post("/register", async (req, res) => {
         name,
         email,
         role,
+        email_verified: true
       },
     });
   } catch (error) {

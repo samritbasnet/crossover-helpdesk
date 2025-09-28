@@ -64,3 +64,6 @@ seed*.js
 # Cache
 .cache/
 .parcel-cache/
+
+# Documentation
+cloud-ai-fullstack-roadmap.md

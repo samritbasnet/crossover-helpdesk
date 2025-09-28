@@ -72,6 +72,9 @@ const AppRoutes = () => {
         <AuthProvider>
           <Navbar />
           <Routes>
+            {/* Default route redirects to login */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            
             {/* Public Routes */}
             <Route
               path="/login"
