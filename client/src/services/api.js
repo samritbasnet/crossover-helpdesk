@@ -2,39 +2,47 @@
 import axios from "axios";
 
 // API base URL configuration
-// In production, use relative path to leverage Netlify's proxy
-// In development, use the local server
-const getApiBase = () => {
-  // If REACT_APP_API_BASE is explicitly set, use it
-  if (process.env.REACT_APP_API_BASE) {
-    return process.env.REACT_APP_API_BASE;
-  }
-  
-  // In production, use relative path
+const getApiConfig = () => {
+  // In production, use relative path to leverage Netlify's proxy
   if (process.env.NODE_ENV === 'production') {
-    return '/api';
+    return {
+      baseURL: process.env.REACT_APP_API_BASE || '/api',
+      withCredentials: false,
+      timeout: 30000
+    };
   }
   
-  // Default to local development server
-  return 'http://localhost:3000/api';
+  // In development, use the local server
+  return {
+    baseURL: process.env.REACT_APP_API_BASE || 'http://localhost:3000/api',
+    withCredentials: true,
+    timeout: 10000
+  };
 };
 
-const API_BASE = getApiBase();
+const { baseURL, withCredentials, timeout } = getApiConfig();
 
-// Log the API base URL for debugging (removed in production)
+// Log the API configuration for debugging
 if (process.env.NODE_ENV !== 'production') {
-  console.log('API Base URL:', API_BASE);
+  console.log('API Configuration:', {
+    baseURL,
+    withCredentials,
+    timeout,
+    nodeEnv: process.env.NODE_ENV,
+    apiBase: process.env.REACT_APP_API_BASE
+  });
 }
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: API_BASE,
+  baseURL,
   headers: {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest'
   },
-  withCredentials: false, // Disable credentials for proxy
-  timeout: 30000, // Increased timeout for production
+  withCredentials,
+  timeout
 });
 
 // Add token to requests if user is logged in

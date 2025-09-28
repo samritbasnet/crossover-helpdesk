@@ -8,35 +8,40 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // CORS configuration
+const allowedOrigins = [
+  'https://crossover-ticket.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:3001'
+];
+
+// Production CORS configuration
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // List of allowed origins
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://crossover-ticket.netlify.app',
-      'https://crossover-helpdesk.onrender.com'
-    ];
-    
-    // Check if the origin is allowed
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+    if (!origin && process.env.NODE_ENV !== 'production') {
       return callback(null, true);
     }
-    
+
     // In production, only allow specific origins
+    if (process.env.NODE_ENV === 'production') {
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
       return callback(new Error('Not allowed by CORS'));
+    }
+    
+    // In development, allow all origins with logging
+    console.log(`Allowing request from: ${origin}`);
+    return callback(null, true);
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  credentials: true,
   optionsSuccessStatus: 200
 };
 
-// Enable CORS for all routes
+// Apply CORS with the above options
 app.use(cors(corsOptions));
 
 // Log incoming requests
@@ -45,7 +50,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Handle preflight requests
+// Explicitly handle preflight requests
 app.options('*', cors(corsOptions));
 
 // Middleware
