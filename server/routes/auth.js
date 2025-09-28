@@ -59,12 +59,12 @@ router.post("/register", async (req, res) => {
     }
 
     // Additional validation for agent role (optional - remove if not needed)
-    if (role === "agent" && name.toLowerCase().includes("admin")) {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot create agent account with 'admin' in name",
-      });
-    }
+    // if (role === "agent" && name.toLowerCase().includes("admin")) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Cannot create agent account with 'admin' in name",
+    //   });
+    // }
 
     // Check if user already exists (case-insensitive)
     const existingUser = await getQuery(
@@ -83,15 +83,15 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const userRole = role || "user";
+    const finalRole = role || "user";
     const result = await runQuery(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-      [name, email, hashedPassword, userRole]
+      [name, email, hashedPassword, finalRole]
     );
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: result.id, email, role: userRole },
+      { userId: result.id, email, role: finalRole },
       process.env.JWT_SECRET || "fallback-secret-key-for-development-only",
       { expiresIn: "24h" }
     );
@@ -104,7 +104,7 @@ router.post("/register", async (req, res) => {
         id: result.id,
         name,
         email,
-        role,
+        role: finalRole,
       },
     });
   } catch (error) {
