@@ -7,6 +7,7 @@ let db = null;
 
 // Helper function to run database queries
 const runQuery = (query, params = []) => {
+  console.log("Executing runQuery:", query, "with params:", params);
   return new Promise((resolve, reject) => {
     const db = getDatabase();
     db.run(query, params, function (err) {
@@ -16,6 +17,7 @@ const runQuery = (query, params = []) => {
         console.error("Params:", params);
         reject(err);
       } else {
+        console.log("runQuery success, lastID:", this.lastID, "changes:", this.changes);
         resolve({ id: this.lastID, changes: this.changes });
       }
     });
@@ -85,7 +87,7 @@ const createTables = () => {
         password TEXT NOT NULL,
         name TEXT NOT NULL,
         role TEXT DEFAULT 'user',
-        email_notifications TEXT DEFAULT 'all' CHECK(email_notifications IN ('all', 'important', 'none')),
+        email_notifications TEXT DEFAULT 'all',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
