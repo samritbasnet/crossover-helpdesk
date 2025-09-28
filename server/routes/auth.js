@@ -91,7 +91,7 @@ router.post("/register", async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: result.id, email, role },
-      JWT_SECRET,
+      process.env.JWT_SECRET || "fallback-secret-key-for-development-only",
       { expiresIn: "24h" }
     );
 
