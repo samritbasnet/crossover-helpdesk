@@ -4,6 +4,7 @@ import {
   Article,
   Dashboard,
   Logout,
+  Settings,
   Support,
 } from "@mui/icons-material";
 import {
@@ -130,6 +131,10 @@ const Navbar = () => {
                 <Typography variant="body2" color="text.secondary">
                   {user.name} ({user.role})
                 </Typography>
+              </MenuItem>
+              <MenuItem onClick={() => { navigate('/settings'); handleClose(); }}>
+                <Settings sx={{ mr: 1 }} />
+                Settings
               </MenuItem>
               <MenuItem onClick={handleLogout}>
                 <Logout sx={{ mr: 1 }} />

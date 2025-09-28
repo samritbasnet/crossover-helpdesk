@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import AgentDashboard from "./pages/AgentDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
 import UserDashboard from "./pages/UserDashboard";
 import { USER_ROLES } from "./utils/constants";
 
@@ -140,6 +141,14 @@ const AppRoutes = () => {
             />
             <Route path="/knowledge" element={<KnowledgeBase />} />
             <Route path="/knowledge/:id" element={<ArticleDetail />} />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Default Route */}
             <Route path="/" element={<Navigate to="/dashboard" />} />
