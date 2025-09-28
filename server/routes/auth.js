@@ -33,6 +33,7 @@ const getQuery = (query, params = []) => {
         resolve(row);
       }
     });
+  });
 };
 // Register endpoint
 router.post("/register", async (req, res) => {
