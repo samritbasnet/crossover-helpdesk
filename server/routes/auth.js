@@ -49,10 +49,20 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    // Validate role
+    const validRoles = ["user", "agent", "admin"];
+    if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters long",
+        message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
+      });
+    }
+
+    // Additional validation for agent role (optional - remove if not needed)
+    if (role === "agent" && name.toLowerCase().includes("admin")) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot create agent account with 'admin' in name",
       });
     }
 
@@ -79,9 +89,11 @@ router.post("/register", async (req, res) => {
     );
 
     // Generate JWT token
-    const token = jwt.sign({ userId: result.id, email, role }, JWT_SECRET, {
-      expiresIn: "24h",
-    });
+    const token = jwt.sign(
+      { userId: result.id, email, role },
+      JWT_SECRET,
+      { expiresIn: "24h" }
+    );
 
     res.status(201).json({
       success: true,
