@@ -154,7 +154,7 @@ router.post("/login", async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
+      process.env.JWT_SECRET || "fallback-secret-key-for-development-only",
       { expiresIn: "24h" }
     );
 
@@ -190,7 +190,7 @@ router.get("/verify", async (req, res) => {
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "fallback-secret-key-for-development-only");
 
     // Get fresh user data
     const user = await getQuery(
