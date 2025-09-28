@@ -1,8 +1,12 @@
 // API Service - Handles all communication with the backend
 import axios from "axios";
 
-// API base URL from environment (CRA: REACT_APP_API_BASE). Fallback to local dev.
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3000/api";
+// API base URL from environment (CRA: REACT_APP_API_BASE).
+// In production, this will be a relative path that goes through Netlify's proxy
+// In development, it will point to the local server
+const API_BASE = process.env.NODE_ENV === 'production' 
+  ? process.env.REACT_APP_API_BASE || '/api'
+  : 'http://localhost:3000/api';
 
 // Log the API base URL for debugging (removed in production)
 if (process.env.NODE_ENV !== 'production') {
@@ -16,8 +20,8 @@ const api = axios.create({
     "Content-Type": "application/json",
     "Accept": "application/json",
   },
-  withCredentials: true, // Important for cookies if you're using them
-  timeout: 10000, // 10 second timeout
+  withCredentials: false, // Disable credentials for proxy
+  timeout: 30000, // Increased timeout for production
 });
 
 // Add token to requests if user is logged in

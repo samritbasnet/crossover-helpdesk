@@ -7,7 +7,8 @@
 [build.environment]
   NODE_VERSION = "18"
   CI = "false"
-  REACT_APP_API_BASE = "https://crossover-helpdesk.onrender.com/api"
+  # Update the frontend to use relative paths for API calls
+  REACT_APP_API_BASE = "/api"
   REACT_APP_NAME = "Crossover Helpdesk"
 
 # Redirect all routes to index.html for React Router
@@ -15,6 +16,14 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Proxy API requests to the backend server
+[[redirects]]
+  from = "/api/*"
+  to = "https://crossover-helpdesk.onrender.com/api/:splat"
+  status = 200
+  force = true
+  headers = {Access-Control-Allow-Origin = "*"}
 
 # Security headers
 [[headers]]

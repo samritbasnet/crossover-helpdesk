@@ -7,16 +7,15 @@ const { initializeDatabase } = require("./config/database");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS configuration - Permissive for testing
+// CORS configuration - Allow all origins for now
 app.use((req, res, next) => {
   // Log incoming requests for debugging
   console.log(`Incoming ${req.method} request to ${req.path} from origin: ${req.headers.origin}`);
   
-  // Allow all origins for now
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  // Allow all origins
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
   
   // Handle preflight requests
