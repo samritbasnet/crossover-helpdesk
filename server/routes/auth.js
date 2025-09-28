@@ -39,62 +39,76 @@ const getQuery = (query, params = []) => {
 // Register endpoint
 router.post("/register", async (req, res) => {
   try {
+    console.log("=== SIGNUP REQUEST START ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+
     const { name, email, password, role = "user" } = req.body;
 
     // Validation
+    console.log("Validating input fields...");
     if (!name || !email || !password) {
+      console.log("Validation failed: missing required fields");
       return res.status(400).json({
         success: false,
         message: "Name, email, and password are required",
       });
     }
 
+    console.log("Input validation passed");
+
     // Validate role
     const validRoles = ["user", "agent", "admin"];
     if (role && !validRoles.includes(role)) {
+      console.log(`Role validation failed: ${role} not in ${validRoles}`);
       return res.status(400).json({
         success: false,
         message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
       });
     }
 
-    // Additional validation for agent role (optional - remove if not needed)
-    if (role === "agent" && name.toLowerCase().includes("admin")) {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot create agent account with 'admin' in name",
-      });
-    }
+    console.log(`Role validation passed: ${role}`);
 
     // Check if user already exists (case-insensitive)
+    console.log("Checking if user already exists...");
     const existingUser = await getQuery(
       "SELECT id, email FROM users WHERE LOWER(email) = LOWER(?)",
       [email]
     );
 
     if (existingUser) {
+      console.log(`User already exists: ${existingUser.email}`);
       return res.status(409).json({
         success: false,
         message: `An account with email "${existingUser.email}" already exists. Please use a different email address or try logging in instead.`,
       });
     }
 
+    console.log("User doesn't exist, proceeding with registration");
+
     // Hash password
+    console.log("Hashing password...");
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("Password hashed successfully");
 
     // Create user
+    console.log(`Creating user with role: ${role}`);
     const finalRole = role || "user";
     const result = await runQuery(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
       [name, email, hashedPassword, finalRole]
     );
+    console.log(`User created successfully with ID: ${result.id}`);
 
     // Generate JWT token
+    console.log("Generating JWT token...");
     const token = jwt.sign(
       { userId: result.id, email, role: finalRole },
       process.env.JWT_SECRET || "558c0827173df93a270c9f55ed776d6a",
       { expiresIn: "24h" }
     );
+    console.log("JWT token generated successfully");
+
+    console.log("=== SIGNUP REQUEST SUCCESS ===");
 
     res.status(201).json({
       success: true,
@@ -108,12 +122,17 @@ router.post("/register", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("=== SIGNUP REQUEST FAILED ===");
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
     console.error("Error stack:", error.stack);
+    console.error("Request body was:", JSON.stringify(req.body, null, 2));
+
     res.status(500).json({
       success: false,
       message: "Internal server error",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 });
