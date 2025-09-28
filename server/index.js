@@ -1,20 +1,25 @@
 // index.js - Complete server setup
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const { initializeDatabase } = require("./config/database");
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Import routes
+const authRoutes = require("./routes/auth");
+const ticketRoutes = require("./routes/tickets");
+const knowledgeRoutes = require("./routes/knowledge");
+const userRoutes = require("./routes/users");
 
-// CORS configuration
+const PORT = process.env.PORT || 3000;
+const app = express();
+
 const allowedOrigins = [
   'https://crossover-ticket.netlify.app',
   'http://localhost:3000',
   'http://localhost:3001'
 ];
 
-// Production CORS configuration
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -29,7 +34,7 @@ const corsOptions = {
       }
       return callback(new Error('Not allowed by CORS'));
     }
-    
+
     // In development, allow all origins with logging
     console.log(`Allowing request from: ${origin}`);
     return callback(null, true);

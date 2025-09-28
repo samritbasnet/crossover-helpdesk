@@ -90,8 +90,6 @@ router.put("/preferences", authenticateToken, async (req, res) => {
 // Get user profile
 router.get("/profile", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId;
-
     const user = await getQuery(
       "SELECT id, name, email, role, created_at, updated_at FROM users WHERE id = ?",
       [userId]
