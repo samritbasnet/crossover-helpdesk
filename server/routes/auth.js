@@ -56,16 +56,16 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // Check if user already exists (case-insensitive)
     const existingUser = await getQuery(
-      "SELECT id FROM users WHERE email = ?",
+      "SELECT id, email FROM users WHERE LOWER(email) = LOWER(?)",
       [email]
     );
 
     if (existingUser) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: "User with this email already exists",
+        message: `An account with email "${existingUser.email}" already exists. Please use a different email address or try logging in instead.`,
       });
     }
 
