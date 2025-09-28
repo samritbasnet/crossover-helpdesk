@@ -81,7 +81,8 @@ const createTables = () => {
   return new Promise((resolve, reject) => {
     // Users table with all necessary fields
     const usersTable = `
-      CREATE TABLE IF NOT EXISTS users (
+      DROP TABLE IF EXISTS users;
+      CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
