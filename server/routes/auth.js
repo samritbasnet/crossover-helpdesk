@@ -75,7 +75,7 @@ router.post("/register", async (req, res) => {
 
     // Create user
     const result = await runQuery(
-      "INSERT INTO users (name, email, password, role, email_verified) VALUES (?, ?, ?, ?, 1)",
+      "INSERT INTO users (name, email, password, role, email_verified) VALUES (?, ?, ?, ?, true)",
       [name, email, hashedPassword, role]
     );
 
