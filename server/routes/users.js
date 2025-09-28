@@ -46,7 +46,48 @@ const getAllQuery = (query, params = []) => {
   });
 };
 
-// Get current user profile
+// Update email notification preferences
+router.put("/preferences", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { email_notifications } = req.body;
+
+    // Validate email notification preference
+    const validPreferences = ['all', 'important', 'none'];
+    if (!validPreferences.includes(email_notifications)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email notification preference. Must be one of: all, important, none"
+      });
+    }
+
+    // Update user preferences
+    await runQuery(
+      "UPDATE users SET email_notifications = ? WHERE id = ?",
+      [email_notifications, userId]
+    );
+
+    // Get updated user info
+    const user = await getQuery(
+      "SELECT id, name, email, role, email_notifications FROM users WHERE id = ?",
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      message: "Email preferences updated successfully",
+      user
+    });
+  } catch (error) {
+    console.error("Update preferences error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update preferences. Please try again."
+    });
+  }
+});
+
+// Get user profile
 router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;

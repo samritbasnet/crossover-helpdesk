@@ -1,5 +1,12 @@
 // controllers/ticketController.js - Ticket business logic
 const { getDatabase } = require("../config/database");
+const {
+  notifyTicketCreated,
+  notifyTicketUpdated,
+  notifyTicketResolved,
+  notifyTicketAssigned,
+  notifyAgentAssigned
+} = require("../services/emailService");
 
 // Helper functions for database operations
 const runQuery = (query, params = []) => {
@@ -89,16 +96,30 @@ const createTicket = async (req, res) => {
       [title.trim(), description.trim(), priority, category.trim(), userId]
     );
 
-    // Get the created ticket with user info
+    // Get the created ticket with user info including email preferences
     const ticket = await getQuery(
       `
-      SELECT t.*, u.name as user_name, u.email as user_email
+      SELECT t.*, u.name as user_name, u.email as user_email, u.email_notifications
       FROM tickets t
       JOIN users u ON t.user_id = u.id
       WHERE t.id = ?
     `,
       [result.id]
     );
+
+    // Send email notification to user
+    try {
+      const user = {
+        name: ticket.user_name,
+        email: ticket.user_email,
+        email_notifications: ticket.email_notifications
+      };
+      await notifyTicketCreated(ticket, user);
+      console.log(`📧 Ticket creation notification sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('📧 Failed to send ticket creation notification:', emailError.message);
+      // Don't fail the request if email fails
+    }
 
     res.status(201).json({
       success: true,
@@ -467,13 +488,14 @@ const updateTicket = async (req, res) => {
     )} WHERE id = ?`;
     await runQuery(updateQuery, params);
 
-    // Get updated ticket
+    // Get updated ticket with all user info
     const updatedTicket = await getQuery(
       `
       SELECT t.*,
              u.name as user_name,
              u.email as user_email,
-             a.name as assigned_to_name
+             a.name as assigned_to_name,
+             a.email as assigned_to_email
       FROM tickets t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN users a ON t.assigned_to = a.id
@@ -481,6 +503,65 @@ const updateTicket = async (req, res) => {
     `,
       [ticketId]
     );
+
+    // Get the user who made the update
+    const updatedBy = await getQuery(
+      "SELECT id, name, email, role FROM users WHERE id = ?",
+      [userId]
+    );
+
+    // Send email notifications
+    try {
+      const ticketOwner = {
+        name: updatedTicket.user_name,
+        email: updatedTicket.user_email
+      };
+
+      // Determine what changed for notification
+      const changes = [];
+      if (status !== undefined && status !== ticket.status) {
+        changes.push(`Status changed from "${ticket.status}" to "${status}"`);
+        
+        // Special notification for resolved tickets
+        if (status === 'resolved') {
+          await notifyTicketResolved(updatedTicket, ticketOwner, updatedBy);
+          console.log(`📧 Ticket resolved notification sent to ${ticketOwner.email}`);
+        }
+      }
+      
+      if (priority !== undefined && priority !== ticket.priority) {
+        changes.push(`Priority changed from "${ticket.priority}" to "${priority}"`);
+      }
+      
+      if (assigned_to !== undefined && assigned_to !== ticket.assigned_to) {
+        if (assigned_to) {
+          const assignedAgent = await getQuery(
+            "SELECT id, name, email, role FROM users WHERE id = ?",
+            [assigned_to]
+          );
+          if (assignedAgent) {
+            changes.push(`Ticket assigned to ${assignedAgent.name}`);
+            // Notify the ticket owner about assignment
+            await notifyTicketAssigned(updatedTicket, ticketOwner, assignedAgent);
+            // Notify the assigned agent
+            await notifyAgentAssigned(updatedTicket, ticketOwner, assignedAgent);
+            console.log(`📧 Assignment notifications sent`);
+          }
+        } else {
+          changes.push(`Ticket unassigned`);
+        }
+      }
+
+      // Send general update notification if there were changes (but not for resolved tickets as they get special treatment)
+      if (changes.length > 0 && status !== 'resolved') {
+        await notifyTicketUpdated(updatedTicket, ticketOwner, updatedBy, changes);
+        console.log(`📧 Ticket update notification sent to ${ticketOwner.email}`);
+      }
+
+    } catch (emailError) {
+      console.error('📧 Failed to send ticket update notification:', emailError.message);
+      // Don't fail the request if email fails
+    }
 
     res.json({
       success: true,
