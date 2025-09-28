@@ -1,149 +1,83 @@
-// API Service - Handles all communication with the backend
+// API Service - Simple HTTP client for backend communication
 import axios from "axios";
 
-// API base URL configuration
+// API configuration - determines base URL based on environment
 const getApiConfig = () => {
-  // Check if we have the Netlify environment variable set
-  if (process.env.REACT_APP_API_BASE === '/api') {
-    console.log('🚀 NETLIFY PRODUCTION - Using proxy at /api');
-    return {
-      baseURL: '/api',
-      withCredentials: false,
-      timeout: 30000
-    };
-  }
-  
-  // Check if we're in production mode
+  // In production, use relative path for Netlify proxy
   if (process.env.NODE_ENV === 'production') {
-    console.log('🚀 PRODUCTION MODE - Using Netlify proxy');
-    return {
-      baseURL: '/api',
-      withCredentials: false,
-      timeout: 30000
-    };
+    console.log('Production mode - using Netlify proxy');
+    return { baseURL: '/api' };
   }
-  
-  // In development, use the local server
-  console.log('🔧 DEVELOPMENT MODE - Using local server');
-  return {
-    baseURL: process.env.REACT_APP_API_BASE || 'http://localhost:3000/api',
-    withCredentials: true,
-    timeout: 10000
-  };
+
+  // In development, use local server
+  console.log('Development mode - using local server');
+  return { baseURL: process.env.REACT_APP_API_BASE || 'http://localhost:3000/api' };
 };
 
-const { baseURL, withCredentials, timeout } = getApiConfig();
-
-// Log the API configuration for debugging (always log in production for now)
-console.log('🔍 API Configuration Debug:', {
-  baseURL,
-  withCredentials,
-  timeout,
-  nodeEnv: process.env.NODE_ENV,
-  apiBase: process.env.REACT_APP_API_BASE,
-  location: window.location.href,
-  hostname: window.location.hostname,
-  isNetlify: window.location.hostname.includes('netlify'),
-  allEnvVars: Object.keys(process.env).filter(key => key.startsWith('REACT_APP_'))
-});
-
-// Create axios instance with base configuration
+// Create axios instance with configuration
 const api = axios.create({
-  baseURL,
+  ...getApiConfig(),
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest'
   },
-  withCredentials,
-  timeout
 });
 
-// Add token to requests if user is logged in
+// Request interceptor - add auth token to requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Log the actual request being made
-    console.log('Making API request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: config.baseURL + config.url
-    });
-    
+
+    // Log requests in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('API Request:', {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        fullURL: config.baseURL + config.url
+      });
+    }
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for better error handling
+// Response interceptor - handle common errors
 api.interceptors.response.use(
   (response) => {
+    // Log successful responses in development
     if (process.env.NODE_ENV !== 'production') {
-      console.log('API Success:', {
-        url: response.config.url,
-        status: response.status,
-        data: response.data
-      });
+      console.log('API Success:', response.config.url, response.status);
     }
     return response;
   },
   (error) => {
-    // Log error for debugging
     console.error('API Error:', {
       url: error.config?.url,
-      method: error.config?.method,
-      baseURL: error.config?.baseURL,
       status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message,
-      config: process.env.NODE_ENV !== 'production' ? error.config : undefined,
+      message: error.response?.data?.message || error.message
     });
 
-    // Handle specific error statuses
-    if (error.response) {
-      switch (error.response.status) {
-        case 401: // Unauthorized
-          localStorage.removeItem("token");
-          // Only redirect if not on login page and not already redirecting
-          if (!window.location.pathname.includes('/login') &&
-              !window.location.search.includes('session_expired=true')) {
-            window.location.href = "/login?session_expired=true";
-          }
-          break;
-        case 403: // Forbidden
-          // Handle 403 Forbidden errors
-          break;
-        case 404: // Not Found
-          // Handle 404 Not Found errors
-          break;
-        case 500: // Internal Server Error
-          // Handle 500 errors
-          break;
-        default:
-          // Handle other status codes
-          break;
+    // Handle authentication errors
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      // Redirect to login if not already there
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = "/login?session_expired=true";
       }
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('No response received:', error.request);
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('Request setup error:', error.message);
     }
 
-    // Return a user-friendly error message
-    const errorMessage = error.response?.data?.message || 
-                        error.message || 
-                        'An unexpected error occurred. Please try again.';
-    
+    // Return user-friendly error
+    const errorMessage = error.response?.data?.message ||
+                        error.message ||
+                        'Something went wrong. Please try again.';
+
     return Promise.reject({
       message: errorMessage,
       status: error.response?.status,
@@ -154,18 +88,19 @@ api.interceptors.response.use(
 
 // Authentication API calls
 export const authAPI = {
+  // User registration
   signup: async (userData) => {
     const response = await api.post("/auth/register", userData);
     return response.data;
   },
 
-  // Login user
+  // User login
   login: async (credentials) => {
     const response = await api.post("/auth/login", credentials);
     return response.data;
   },
 
-  // Get current user info
+  // Verify current user session
   getCurrentUser: async () => {
     const response = await api.get("/auth/verify");
     return response.data;
@@ -174,73 +109,100 @@ export const authAPI = {
 
 // Tickets API calls
 export const ticketsAPI = {
-  // Get all tickets (filtered by user role)
+  // Get tickets with optional filters
   getTickets: async (filters = {}) => {
     const response = await api.get("/tickets", { params: filters });
-    return response.data; // Backend returns { success, tickets, pagination, stats }
+    return response.data;
   },
 
   // Get single ticket
   getTicket: async (id) => {
     const response = await api.get(`/tickets/${id}`);
-    return response.data; // Backend returns { success, ticket }
+    return response.data;
   },
 
   // Create new ticket
   createTicket: async (ticketData) => {
     const response = await api.post("/tickets", ticketData);
-    return response.data; // Backend returns { success, message, ticket }
+    return response.data;
   },
 
   // Update ticket
   updateTicket: async (id, ticketData) => {
     const response = await api.put(`/tickets/${id}`, ticketData);
-    return response.data; // Backend returns { success, message, ticket }
+    return response.data;
   },
 
   // Delete ticket
   deleteTicket: async (id) => {
     const response = await api.delete(`/tickets/${id}`);
-    return response.data; // Backend returns { success, message }
+    return response.data;
   },
 };
 
 // Knowledge Base API calls
 export const knowledgeAPI = {
-  // Get all knowledge articles
+  // Get knowledge articles
   getArticles: async (filters = {}) => {
     const response = await api.get("/knowledge", { params: filters });
-    return response.data; // Backend returns { success, data, pagination }
+    return response.data;
   },
 
   // Get single article
   getArticle: async (id) => {
     const response = await api.get(`/knowledge/${id}`);
-    return response.data; // Backend returns { success, data }
+    return response.data;
   },
 
   // Create new article
   createArticle: async (articleData) => {
     const response = await api.post("/knowledge", articleData);
-    return response.data; // Backend returns { success, message, data }
+    return response.data;
   },
 
   // Update article
   updateArticle: async (id, articleData) => {
     const response = await api.put(`/knowledge/${id}`, articleData);
-    return response.data; // Backend returns { success, message, data }
+    return response.data;
   },
 
   // Delete article
   deleteArticle: async (id) => {
     const response = await api.delete(`/knowledge/${id}`);
-    return response.data; // Backend returns { success, message }
+    return response.data;
   },
 
   // Mark article as helpful
   markHelpful: async (id) => {
     const response = await api.post(`/knowledge/${id}/helpful`);
-    return response.data; // Backend returns { success, message, helpful_count }
+    return response.data;
+  },
+};
+
+// User management API calls
+export const userAPI = {
+  // Get user profile
+  getProfile: async () => {
+    const response = await api.get("/users/profile");
+    return response.data;
+  },
+
+  // Update user profile
+  updateProfile: async (profileData) => {
+    const response = await api.put("/users/profile", profileData);
+    return response.data;
+  },
+
+  // Update email preferences
+  updatePreferences: async (preferences) => {
+    const response = await api.put("/users/preferences", preferences);
+    return response.data;
+  },
+
+  // Get all users (admin only)
+  getAllUsers: async (filters = {}) => {
+    const response = await api.get("/users", { params: filters });
+    return response.data;
   },
 };
 

@@ -1,41 +1,48 @@
-// config/database.js - Database configuration and initialization
+// config/database.js - Simple database setup
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 
 const dbPath = path.join(__dirname, "..", "helpdesk.db");
 let db = null;
 
+// Initialize database connection
 const initializeDatabase = () => {
   return new Promise((resolve, reject) => {
     db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
-        console.error("Error opening database:", err.message);
+        console.error("❌ Database connection failed:", err.message);
         reject(err);
       } else {
-        console.log("✅ Connected to SQLite database");
+        console.log("✅ Database connected successfully");
         createTables()
-          .then(() => resolve(db))
+          .then(() => {
+            console.log("✅ Database tables ready");
+            resolve(db);
+          })
           .catch(reject);
       }
     });
   });
 };
 
+// Create all database tables
 const createTables = () => {
   return new Promise((resolve, reject) => {
-    const createUsersTable = `
+    // Users table with all necessary fields
+    const usersTable = `
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         name TEXT NOT NULL,
-        role TEXT DEFAULT 'user' CHECK(role IN ('user', 'admin')),
+        role TEXT DEFAULT 'user' CHECK(role IN ('user', 'agent', 'admin')),
         email_notifications TEXT DEFAULT 'all' CHECK(email_notifications IN ('all', 'important', 'none')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
 
-    const createTicketsTable = `
+    // Tickets table
+    const ticketsTable = `
       CREATE TABLE IF NOT EXISTS tickets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -52,7 +59,8 @@ const createTables = () => {
       )
     `;
 
-    const createTicketCommentsTable = `
+    // Comments table
+    const commentsTable = `
       CREATE TABLE IF NOT EXISTS ticket_comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ticket_id INTEGER NOT NULL,
@@ -64,8 +72,8 @@ const createTables = () => {
       )
     `;
 
-    // Knowledge base articles
-    const createKnowledgeTable = `
+    // Knowledge base table
+    const knowledgeTable = `
       CREATE TABLE IF NOT EXISTS knowledge (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -79,67 +87,48 @@ const createTables = () => {
       )
     `;
 
+    // Create tables in sequence
     db.serialize(() => {
-      db.run(createUsersTable, (err) => {
+      db.run(usersTable, handleError("users table"));
+      db.run(ticketsTable, handleError("tickets table"));
+      db.run(commentsTable, handleError("comments table"));
+      db.run(knowledgeTable, (err) => {
         if (err) {
-          console.error("Error creating users table:", err.message);
+          console.error("❌ Error creating knowledge table:", err.message);
           reject(err);
         } else {
-          console.log("✅ Users table created/verified");
-        }
-      });
-
-      db.run(createTicketsTable, (err) => {
-        if (err) {
-          console.error("Error creating tickets table:", err.message);
-          reject(err);
-        } else {
-          console.log("✅ Tickets table created/verified");
-        }
-      });
-
-      db.run(createTicketCommentsTable, (err) => {
-        if (err) {
-          console.error("Error creating ticket_comments table:", err.message);
-          reject(err);
-        } else {
-          console.log("✅ Ticket comments table created/verified");
-          // Create knowledge table last
-          db.run(createKnowledgeTable, (err) => {
-            if (err) {
-              console.error("Error creating knowledge table:", err.message);
-              reject(err);
-            } else {
-              console.log("✅ Knowledge table created/verified");
-              resolve();
-            }
-          });
+          console.log("✅ Knowledge table created/verified");
+          resolve();
         }
       });
     });
   });
 };
 
+// Simple error handler for table creation
+const handleError = (tableName) => (err) => {
+  if (err) {
+    console.error(`❌ Error creating ${tableName}:`, err.message);
+  } else {
+    console.log(`✅ ${tableName} created/verified`);
+  }
+};
+
+// Get database instance
 const getDatabase = () => {
   if (!db) {
-    throw new Error(
-      "Database not initialized. Call initializeDatabase() first."
-    );
+    throw new Error("Database not initialized. Call initializeDatabase() first.");
   }
   return db;
 };
 
+// Close database connection
 const closeDatabase = () => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (db) {
-      db.close((err) => {
-        if (err) {
-          console.error("Error closing database:", err.message);
-          reject(err);
-        } else {
-          console.log("✅ Database connection closed");
-          resolve();
-        }
+      db.close(() => {
+        console.log("✅ Database connection closed");
+        resolve();
       });
     } else {
       resolve();

@@ -1,40 +1,38 @@
-// middleware/auth.js - Authentication middleware
+// middleware/auth.js - Simple authentication middleware
 const jwt = require("jsonwebtoken");
 const { getDatabase } = require("../config/database");
 
-const getQuery = (query, params = []) => {
+// Simple database query helper
+const dbQuery = (query, params = []) => {
   return new Promise((resolve, reject) => {
     const db = getDatabase();
     db.get(query, params, (err, row) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(row);
-      }
+      if (err) reject(err);
+      else resolve(row);
     });
   });
 };
 
+// Main authentication middleware - checks JWT tokens
 const authenticateToken = async (req, res, next) => {
   try {
+    // Get token from Authorization header
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(" ")[1]; // Format: "Bearer TOKEN"
 
+    // No token provided
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Access token required",
+        message: "Authentication required. Please log in.",
       });
     }
 
-    // Verify token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key"
-    );
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user still exists
-    const user = await getQuery(
+    // Check if user still exists in database
+    const user = await dbQuery(
       "SELECT id, name, email, role FROM users WHERE id = ?",
       [decoded.userId]
     );
@@ -42,11 +40,11 @@ const authenticateToken = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid token - user not found",
+        message: "User account not found.",
       });
     }
 
-    // Add user info to request
+    // Add user info to request object
     req.user = {
       userId: user.id,
       name: user.name,
@@ -54,51 +52,54 @@ const authenticateToken = async (req, res, next) => {
       role: user.role,
     };
 
+    // Continue to next middleware/route
     next();
   } catch (error) {
-    console.error("Authentication error:", error);
+    console.error("Authentication error:", error.message);
 
+    // Handle different JWT errors
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
-        message: "Token has expired",
+        message: "Your session has expired. Please log in again.",
       });
     }
 
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
-        message: "Invalid token",
+        message: "Invalid authentication token.",
       });
     }
 
+    // Generic server error
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Authentication failed. Please try again.",
     });
   }
 };
 
-// Middleware to check if user is admin
+// Check if user is admin
 const requireAdmin = (req, res, next) => {
   if (req.user && req.user.role === "admin") {
-    next();
+    next(); // User is admin, continue
   } else {
     return res.status(403).json({
       success: false,
-      message: "Admin access required",
+      message: "Admin access required.",
     });
   }
 };
 
-// Middleware to check if user is admin or agent
+// Check if user is admin or agent
 const requireAgentOrAdmin = (req, res, next) => {
   if (req.user && ["admin", "agent"].includes(req.user.role)) {
-    next();
+    next(); // User has required role, continue
   } else {
     return res.status(403).json({
       success: false,
-      message: "Agent or Admin access required",
+      message: "Agent or Admin access required.",
     });
   }
 };
