@@ -92,7 +92,7 @@ router.post("/register", async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: result.id, email, role: finalRole },
-      "your-secret-key-change-this-in-production",
+      process.env.JWT_SECRET || "558c0827173df93a270c9f55ed776d6a",
       { expiresIn: "24h" }
     );
 
@@ -157,7 +157,7 @@ router.post("/login", async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      "your-secret-key-change-this-in-production",
+      process.env.JWT_SECRET || "558c0827173df93a270c9f55ed776d6a",
       { expiresIn: "24h" }
     );
 
@@ -193,7 +193,7 @@ router.get("/verify", async (req, res) => {
       });
     }
 
-    const decoded = jwt.verify(token, "your-secret-key-change-this-in-production");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "558c0827173df93a270c9f55ed776d6a");
 
     // Get fresh user data
     const user = await getQuery(
