@@ -35,10 +35,11 @@ const getQuery = (query, params = []) => {
     });
   });
 };
-// Register endpoint
+// Register endpoint - Only allows creating regular users
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, role = "user" } = req.body;
+    const { name, email, password } = req.body;
+    const role = "user"; // Force role to be 'user' for all registrations
 
     // Input validation
     if (!name || !email || !password) {
@@ -48,12 +49,11 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Validate role
-    const validRoles = ["user", "agent", "admin"];
-    if (role && !validRoles.includes(role)) {
-      return res.status(400).json({
+    // Only allow user role for registration
+    if (req.body.role && req.body.role !== "user") {
+      return res.status(403).json({
         success: false,
-        message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
+        message: "You are not authorized to create accounts with this role"
       });
     }
 
@@ -101,18 +101,17 @@ router.post("/register", async (req, res) => {
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({
-      success: false,
       message: "Internal server error",
     });
   }
 });
 
-// Login endpoint
+// Login endpoint with secure admin authentication
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
+    // Input validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -120,9 +119,9 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // Find user
+    // Find user by email (case-insensitive)
     const user = await getQuery(
-      "SELECT id, name, email, password, role FROM users WHERE email = ?",
+      "SELECT * FROM users WHERE LOWER(email) = LOWER(?)",
       [email]
     );
 
@@ -133,10 +132,21 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
+    // For admin accounts, require additional security
+    if (user.role === 'admin') {
+      // Check for admin-specific environment variables or additional security measures
+      const adminPassword = process.env.ADMIN_PASSWORD;
+      if (adminPassword && password !== adminPassword) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid admin credentials",
+        });
+      }
+    }
+    
+    // Check password for all users
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",

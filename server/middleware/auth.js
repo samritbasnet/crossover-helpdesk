@@ -107,14 +107,54 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Check if user is admin
-const requireAdmin = (req, res, next) => {
-  if (req.user && req.user.role === "admin") {
-    next(); // User is admin, continue
-  } else {
-    return res.status(403).json({
+// Check if user is admin with enhanced security
+const requireAdmin = async (req, res, next) => {
+  try {
+    // Basic role check
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required',
+      });
+    }
+
+    // Verify admin status in database
+    const adminUser = await dbQuery(
+      'SELECT id, email, role FROM users WHERE id = ? AND role = ?',
+      [req.user.userId, 'admin']
+    );
+
+    if (!adminUser) {
+      console.warn(`Admin access attempt with invalid credentials: ${req.user.userId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid admin credentials',
+      });
+    }
+
+    // Additional security: Check if admin login is from a trusted IP (optional)
+    const allowedIPs = process.env.ADMIN_ALLOWED_IPS ? 
+      process.env.ADMIN_ALLOWED_IPS.split(',') : null;
+      
+    if (allowedIPs && allowedIPs.length > 0) {
+      const clientIP = req.ip || req.connection.remoteAddress;
+      if (!allowedIPs.includes(clientIP)) {
+        console.warn(`Admin access attempt from unauthorized IP: ${clientIP}`);
+        return res.status(403).json({
+          success: false,
+          message: 'Access restricted from this location',
+        });
+      }
+    }
+
+    // Attach admin user to request for further use
+    req.adminUser = adminUser;
+    next();
+  } catch (error) {
+    console.error('Admin verification error:', error);
+    return res.status(500).json({
       success: false,
-      message: "Admin access required.",
+      message: 'Error verifying admin status',
     });
   }
 };
