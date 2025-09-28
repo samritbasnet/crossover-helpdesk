@@ -1,12 +1,25 @@
 // API Service - Handles all communication with the backend
 import axios from "axios";
 
-// API base URL from environment (CRA: REACT_APP_API_BASE).
-// In production, this will be a relative path that goes through Netlify's proxy
-// In development, it will point to the local server
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? process.env.REACT_APP_API_BASE || '/api'
-  : 'http://localhost:3000/api';
+// API base URL configuration
+// In production, use relative path to leverage Netlify's proxy
+// In development, use the local server
+const getApiBase = () => {
+  // If REACT_APP_API_BASE is explicitly set, use it
+  if (process.env.REACT_APP_API_BASE) {
+    return process.env.REACT_APP_API_BASE;
+  }
+  
+  // In production, use relative path
+  if (process.env.NODE_ENV === 'production') {
+    return '/api';
+  }
+  
+  // Default to local development server
+  return 'http://localhost:3000/api';
+};
+
+const API_BASE = getApiBase();
 
 // Log the API base URL for debugging (removed in production)
 if (process.env.NODE_ENV !== 'production') {
@@ -41,19 +54,27 @@ api.interceptors.request.use(
 // Response interceptor for better error handling
 api.interceptors.response.use(
   (response) => {
-    // You can log successful responses here if needed
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('API Success:', {
+        url: response.config.url,
+        status: response.status,
+        data: response.data
+      });
+    }
     return response;
   },
   (error) => {
     // Log error for debugging
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('API Error:', {
-        config: error.config,
-        response: error.response?.data,
-        status: error.response?.status,
-        message: error.message,
-      });
-    }
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      baseURL: error.config?.baseURL,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      config: process.env.NODE_ENV !== 'production' ? error.config : undefined,
+    });
 
     // Handle specific error statuses
     if (error.response) {

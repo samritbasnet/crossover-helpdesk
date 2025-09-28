@@ -7,25 +7,46 @@ const { initializeDatabase } = require("./config/database");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS configuration - Allow all origins for now
+// CORS configuration
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://crossover-ticket.netlify.app',
+      'https://crossover-helpdesk.onrender.com'
+    ];
+    
+    // Check if the origin is allowed
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    // In production, only allow specific origins
+      return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+// Enable CORS for all routes
+app.use(cors(corsOptions));
+
+// Log incoming requests
 app.use((req, res, next) => {
-  // Log incoming requests for debugging
-  console.log(`Incoming ${req.method} request to ${req.path} from origin: ${req.headers.origin}`);
-  
-  // Allow all origins
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS preflight request');
-    return res.status(200).end();
-  }
-  
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} from ${req.headers.origin || 'unknown origin'}`);
   next();
 });
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 // Middleware
 app.use(express.json());
