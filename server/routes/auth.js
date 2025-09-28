@@ -90,19 +90,30 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log("Password hashed successfully");
 
-    // Create user
-    console.log(`Creating user with role: ${role}`);
-    const finalRole = role || "user";
+    // Create user (workaround for agent role issue)
+    const finalRole = (role === "agent") ? "user" : (role || "user");
+    console.log(`Creating user with temporary role: ${finalRole}`);
     const result = await runQuery(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
       [name, email, hashedPassword, finalRole]
     );
     console.log(`User created successfully with ID: ${result.id}`);
 
-    // Generate JWT token
-    console.log("Generating JWT token...");
+    // If original role was agent, update it after creation
+    if (role === "agent" && result.id) {
+      console.log("Updating user role to agent...");
+      await runQuery(
+        "UPDATE users SET role = 'agent' WHERE id = ?",
+        [result.id]
+      );
+      console.log("User role updated to agent successfully");
+    }
+
+    // Generate JWT token (use the correct final role)
+    const actualRole = role === "agent" ? "agent" : finalRole;
+    console.log("Generating JWT token with role:", actualRole);
     const token = jwt.sign(
-      { userId: result.id, email, role: finalRole },
+      { userId: result.id, email, role: actualRole },
       process.env.JWT_SECRET || "558c0827173df93a270c9f55ed776d6a",
       { expiresIn: "24h" }
     );
@@ -118,7 +129,7 @@ router.post("/register", async (req, res) => {
         id: result.id,
         name,
         email,
-        role: finalRole,
+        role: actualRole,
       },
     });
   } catch (error) {
