@@ -3,16 +3,28 @@ import axios from "axios";
 
 // API base URL configuration
 const getApiConfig = () => {
-  // In production, use relative path to leverage Netlify's proxy
-  if (process.env.NODE_ENV === 'production') {
+  // Check if we have the Netlify environment variable set
+  if (process.env.REACT_APP_API_BASE === '/api') {
+    console.log('🚀 NETLIFY PRODUCTION - Using proxy at /api');
     return {
-      baseURL: process.env.REACT_APP_API_BASE || '/api',
+      baseURL: '/api',
+      withCredentials: false,
+      timeout: 30000
+    };
+  }
+  
+  // Check if we're in production mode
+  if (process.env.NODE_ENV === 'production') {
+    console.log('🚀 PRODUCTION MODE - Using Netlify proxy');
+    return {
+      baseURL: '/api',
       withCredentials: false,
       timeout: 30000
     };
   }
   
   // In development, use the local server
+  console.log('🔧 DEVELOPMENT MODE - Using local server');
   return {
     baseURL: process.env.REACT_APP_API_BASE || 'http://localhost:3000/api',
     withCredentials: true,
@@ -23,13 +35,16 @@ const getApiConfig = () => {
 const { baseURL, withCredentials, timeout } = getApiConfig();
 
 // Log the API configuration for debugging (always log in production for now)
-console.log('API Configuration:', {
+console.log('🔍 API Configuration Debug:', {
   baseURL,
   withCredentials,
   timeout,
   nodeEnv: process.env.NODE_ENV,
   apiBase: process.env.REACT_APP_API_BASE,
-  location: window.location.href
+  location: window.location.href,
+  hostname: window.location.hostname,
+  isNetlify: window.location.hostname.includes('netlify'),
+  allEnvVars: Object.keys(process.env).filter(key => key.startsWith('REACT_APP_'))
 });
 
 // Create axios instance with base configuration
