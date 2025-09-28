@@ -49,14 +49,14 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Validate role
-    const validRoles = ["user", "agent", "admin"];
-    if (role && !validRoles.includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
-      });
-    }
+    // Validate role (temporarily disabled for debugging)
+    // const validRoles = ["user", "agent", "admin"];
+    // if (role && !validRoles.includes(role)) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
+    //   });
+    // }
 
     // Additional validation for agent role (optional - remove if not needed)
     // if (role === "agent" && name.toLowerCase().includes("admin")) {
