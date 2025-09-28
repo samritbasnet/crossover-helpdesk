@@ -387,7 +387,7 @@ const updateTicket = async (req, res) => {
     const ticketId = req.params.id;
     const userId = req.user.userId;
     const userRole = req.user.role;
-    const { title, description, status, priority, category, assigned_to } =
+    const { title, description, status, priority, category, assigned_to, resolution_notes } =
       req.body;
 
     // Validate ticket ID
@@ -456,17 +456,33 @@ const updateTicket = async (req, res) => {
       params.push(category.trim());
     }
 
-    // Only admins and assigned users can change status and assignment
-    if (userRole === "admin" || ticket.assigned_to === userId) {
+    // Only admins and assigned agents can change status and assignment
+    if (userRole === "admin" || userRole === "agent" || ticket.assigned_to === userId) {
       if (status !== undefined) {
         const validStatuses = ["open", "in-progress", "resolved", "closed"];
         if (validStatuses.includes(status)) {
+          // If resolving a ticket, require resolution notes
+          if (status === 'resolved' && !resolution_notes) {
+            return res.status(400).json({
+              success: false,
+              message: "Resolution notes are required when resolving a ticket",
+            });
+          }
+          
           updateFields.push("status = ?");
           params.push(status);
+          
+          // If resolving, update resolved_at timestamp
+          if (status === 'resolved') {
+            updateFields.push("resolved_at = CURRENT_TIMESTAMP");
+            updateFields.push("resolution_notes = ?");
+            params.push(resolution_notes);
+          }
         }
       }
 
-      if (assigned_to !== undefined && userRole === "admin") {
+      // Only admins can reassign tickets
+      if (assigned_to !== undefined && (userRole === "admin" || userRole === "agent")) {
         updateFields.push("assigned_to = ?");
         params.push(assigned_to || null);
       }
@@ -488,14 +504,18 @@ const updateTicket = async (req, res) => {
     )} WHERE id = ?`;
     await runQuery(updateQuery, params);
 
-    // Get updated ticket with all user info
+    // Get updated ticket with all user info including requester and assignee details
     const updatedTicket = await getQuery(
       `
       SELECT t.*,
+             u.id as user_id,
              u.name as user_name,
              u.email as user_email,
+             u.email_notifications as user_notifications,
+             a.id as assigned_to_id,
              a.name as assigned_to_name,
-             a.email as assigned_to_email
+             a.email as assigned_to_email,
+             a.email_notifications as agent_notifications
       FROM tickets t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN users a ON t.assigned_to = a.id
@@ -513,48 +533,70 @@ const updateTicket = async (req, res) => {
     // Send email notifications
     try {
       const ticketOwner = {
+        id: updatedTicket.user_id,
         name: updatedTicket.user_name,
-        email: updatedTicket.user_email
+        email: updatedTicket.user_email,
+        email_notifications: updatedTicket.user_notifications
       };
 
-      // Determine what changed for notification
       const changes = [];
-      if (status !== undefined && status !== ticket.status) {
-        changes.push(`Status changed from "${ticket.status}" to "${status}"`);
-        
-        // Special notification for resolved tickets
-        if (status === 'resolved') {
-          await notifyTicketResolved(updatedTicket, ticketOwner, updatedBy);
-          console.log(`📧 Ticket resolved notification sent to ${ticketOwner.email}`);
-        }
-      }
+      if (status && status !== ticket.status) changes.push(`Status changed to ${status}`);
+      if (priority && priority !== ticket.priority) changes.push(`Priority changed to ${priority}`);
       
-      if (priority !== undefined && priority !== ticket.priority) {
-        changes.push(`Priority changed from "${ticket.priority}" to "${priority}"`);
-      }
-      
+      // Handle assignment changes
       if (assigned_to !== undefined && assigned_to !== ticket.assigned_to) {
         if (assigned_to) {
-          const assignedAgent = await getQuery(
-            "SELECT id, name, email, role FROM users WHERE id = ?",
-            [assigned_to]
-          );
-          if (assignedAgent) {
-            changes.push(`Ticket assigned to ${assignedAgent.name}`);
-            // Notify the ticket owner about assignment
-            await notifyTicketAssigned(updatedTicket, ticketOwner, assignedAgent);
-            // Notify the assigned agent
-            await notifyAgentAssigned(updatedTicket, ticketOwner, assignedAgent);
-            console.log(`📧 Assignment notifications sent`);
+          changes.push(`Assigned to ${updatedTicket.assigned_to_name}`);
+          
+          // Notify the newly assigned agent
+          if (updatedTicket.assigned_to_id) {
+            await notifyAgentAssigned(
+              updatedTicket,
+              { 
+                id: updatedTicket.assigned_to_id,
+                email: updatedTicket.assigned_to_email,
+                name: updatedTicket.assigned_to_name,
+                email_notifications: updatedTicket.agent_notifications
+              },
+              { 
+                id: userId, 
+                name: req.user.name, 
+                email: req.user.email 
+              }
+            );
           }
         } else {
-          changes.push(`Ticket unassigned`);
+          changes.push('Ticket unassigned');
         }
       }
 
+      // Handle resolution notification
+      if (status === 'resolved') {
+        await notifyTicketResolved(
+          updatedTicket,
+          ticketOwner,
+          { 
+            id: userId,
+            name: req.user.name,
+            email: req.user.email
+          },
+          resolution_notes
+        );
+        console.log(`📧 Resolution notification sent to ${ticketOwner.email}`);
+      } 
       // Send general update notification if there were changes (but not for resolved tickets as they get special treatment)
-      if (changes.length > 0 && status !== 'resolved') {
-        await notifyTicketUpdated(updatedTicket, ticketOwner, updatedBy, changes);
+      else if (changes.length > 0) {
+        await notifyTicketUpdated(
+          updatedTicket,
+          ticketOwner,
+          { 
+            id: userId,
+            name: req.user.name,
+            email: req.user.email,
+            role: userRole
+          },
+          changes
+        );
         console.log(`📧 Ticket update notification sent to ${ticketOwner.email}`);
       }
 

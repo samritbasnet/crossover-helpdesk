@@ -190,50 +190,71 @@ const sendEmail = async (to, subject, html, emailType = 'general', userPreferenc
 // Notification functions
 const notifyTicketCreated = async (ticket, user) => {
   const template = emailTemplates.ticketCreated(ticket, user);
-  return await sendEmail(user.email, template.subject, template.html, 'created', user.email_notifications);
+  return await sendEmail(
+    user.email, 
+    template.subject, 
+    template.html, 
+    'created', 
+    user.email_notifications
+  );
 };
 
 const notifyTicketUpdated = async (ticket, user, updatedBy, changes = null) => {
   const template = emailTemplates.ticketUpdated(ticket, user, updatedBy, changes);
-  return await sendEmail(user.email, template.subject, template.html, 'updated', user.email_notifications);
+  return await sendEmail(
+    user.email, 
+    template.subject, 
+    template.html, 
+    'updated', 
+    user.email_notifications
+  );
 };
 
 const notifyTicketResolved = async (ticket, user, resolvedBy, resolutionNotes = null) => {
   const template = emailTemplates.ticketResolved(ticket, user, resolvedBy, resolutionNotes);
-  return await sendEmail(user.email, template.subject, template.html, 'resolved', user.email_notifications);
+  return await sendEmail(
+    user.email,
+    template.subject,
+    template.html,
+    'resolved',
+    user.email_notifications
+  );
 };
 
 const notifyTicketAssigned = async (ticket, user, assignedAgent) => {
   const template = emailTemplates.ticketAssigned(ticket, user, assignedAgent);
-  return await sendEmail(user.email, template.subject, template.html, 'assigned', user.email_notifications);
+  return await sendEmail(
+    user.email, 
+    template.subject, 
+    template.html, 
+    'assigned', 
+    user.email_notifications
+  );
 };
 
-// Notify agent about new ticket assignment
-const notifyAgentAssigned = async (ticket, user, agent) => {
-  const template = {
-    subject: `New Ticket Assigned: ${ticket.title}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #2196F3;">New Ticket Assignment</h2>
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3>Ticket Details:</h3>
-          <p><strong>Ticket ID:</strong> #${ticket.id}</p>
-          <p><strong>Title:</strong> ${ticket.title}</p>
-          <p><strong>Priority:</strong> <span style="color: ${getPriorityColor(ticket.priority)}">${ticket.priority.toUpperCase()}</span></p>
-          <p><strong>Customer:</strong> ${user.name} (${user.email})</p>
-        </div>
-        <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-          <h4>Description:</h4>
-          <p>${ticket.description}</p>
-        </div>
-        <p style="margin-top: 20px; color: #666;">
-          Please review and respond to this ticket at your earliest convenience.
-        </p>
-      </div>
-    `
-  };
+const notifyAgentAssigned = async (ticket, agent, assignedBy) => {
+  // Check if agent has email notifications enabled
+  if (agent.email_notifications === 'none') {
+    console.log(`Skipping agent notification - email notifications disabled for agent ${agent.id}`);
+    return { success: true, skipped: true };
+  }
+
+  const template = emailTemplates.ticketAssigned(ticket, agent, assignedBy);
   
-  return await sendEmail(agent.email, template.subject, template.html);
+  // Add assignment note
+  const assignmentNote = `This ticket has been assigned to you by ${assignedBy.name} (${assignedBy.role}).`;
+  template.html = template.html.replace(
+    'Your ticket has been assigned',
+    `${assignmentNote}<br><br>Ticket details:`
+  );
+
+  return await sendEmail(
+    agent.email, 
+    `[Agent] ${template.subject}`,
+    template.html,
+    'assigned',
+    agent.email_notifications
+  );
 };
 
 module.exports = {
