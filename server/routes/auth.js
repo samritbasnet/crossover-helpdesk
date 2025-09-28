@@ -36,18 +36,6 @@ const getQuery = (query, params = []) => {
   });
 };
 
-// Add response headers to all auth routes
-router.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  next();
-});
-
 // Register endpoint
 router.post("/register", async (req, res) => {
   try {
