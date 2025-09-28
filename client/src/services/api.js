@@ -4,12 +4,20 @@ import axios from "axios";
 // API base URL from environment (CRA: REACT_APP_API_BASE). Fallback to local dev.
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3000/api";
 
+// Log the API base URL for debugging (removed in production)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('API Base URL:', API_BASE);
+}
+
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE,
   headers: {
     "Content-Type": "application/json",
+    "Accept": "application/json",
   },
+  withCredentials: true, // Important for cookies if you're using them
+  timeout: 10000, // 10 second timeout
 });
 
 // Add token to requests if user is logged in
@@ -26,23 +34,71 @@ api.interceptors.request.use(
   }
 );
 
-// Handle authentication errors
+// Response interceptor for better error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // You can log successful responses here if needed
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid - redirect to login
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+    // Log error for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('API Error:', {
+        config: error.config,
+        response: error.response?.data,
+        status: error.response?.status,
+        message: error.message,
+      });
     }
-    return Promise.reject(error);
+
+    // Handle specific error statuses
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      switch (error.response.status) {
+        case 401: // Unauthorized
+          localStorage.removeItem("token");
+          // Only redirect if not on login page
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = "/login?session_expired=true";
+          }
+          break;
+        case 403: // Forbidden
+          // Handle 403 Forbidden errors
+          break;
+        case 404: // Not Found
+          // Handle 404 Not Found errors
+          break;
+        case 500: // Internal Server Error
+          // Handle 500 errors
+          break;
+        default:
+          // Handle other status codes
+          break;
+      }
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response received:', error.request);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('Request setup error:', error.message);
+    }
+
+    // Return a user-friendly error message
+    const errorMessage = error.response?.data?.message || 
+                        error.message || 
+                        'An unexpected error occurred. Please try again.';
+    
+    return Promise.reject({
+      message: errorMessage,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
   }
 );
 
 // Authentication API calls
 export const authAPI = {
-  // Sign up new user
   signup: async (userData) => {
     const response = await api.post("/auth/register", userData);
     return response.data;
