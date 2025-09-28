@@ -22,16 +22,15 @@ const getApiConfig = () => {
 
 const { baseURL, withCredentials, timeout } = getApiConfig();
 
-// Log the API configuration for debugging
-if (process.env.NODE_ENV !== 'production') {
-  console.log('API Configuration:', {
-    baseURL,
-    withCredentials,
-    timeout,
-    nodeEnv: process.env.NODE_ENV,
-    apiBase: process.env.REACT_APP_API_BASE
-  });
-}
+// Log the API configuration for debugging (always log in production for now)
+console.log('API Configuration:', {
+  baseURL,
+  withCredentials,
+  timeout,
+  nodeEnv: process.env.NODE_ENV,
+  apiBase: process.env.REACT_APP_API_BASE,
+  location: window.location.href
+});
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -52,6 +51,15 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Log the actual request being made
+    console.log('Making API request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: config.baseURL + config.url
+    });
+    
     return config;
   },
   (error) => {
