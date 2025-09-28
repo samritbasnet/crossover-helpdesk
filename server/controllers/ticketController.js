@@ -167,7 +167,7 @@ const getTickets = async (req, res) => {
     let conditions = [];
 
     // Role-based access control
-    if (userRole !== "admin") {
+    if (userRole === "user") {
       conditions.push("t.user_id = ?");
       params.push(parseInt(userId));
     }
@@ -229,7 +229,7 @@ const getTickets = async (req, res) => {
     let countConditions = [];
 
     // Apply same filters for count
-    if (userRole !== "admin") {
+    if (userRole === "user") {
       countConditions.push("t.user_id = ?");
       countParams.push(parseInt(userId));
     }
@@ -265,7 +265,7 @@ const getTickets = async (req, res) => {
     let statsQuery = "SELECT status, COUNT(*) as count FROM tickets";
     let statsParams = [];
 
-    if (userRole !== "admin") {
+    if (userRole === "user") {
       statsQuery += " WHERE user_id = ?";
       statsParams.push(parseInt(userId));
     }
