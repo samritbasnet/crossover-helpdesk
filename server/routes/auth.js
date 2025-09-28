@@ -6,6 +6,15 @@ const { getDatabase } = require("../config/database");
 
 const router = express.Router();
 
+// Handle OPTIONS for all routes
+router.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).end();
+});
+
 // JWT Secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
 
