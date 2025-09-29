@@ -1,9 +1,9 @@
-// index.js - Complete server setup
+// index.js - Complete server setup with MySQL
 require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const { initializeDatabase } = require("./config/database");
+const { initializeDatabase, closeDatabase } = require("./config/database");
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -14,9 +14,24 @@ const userRoutes = require("./routes/users");
 const PORT = process.env.PORT || 3000;
 const app = express();
 
-// For development, allow all origins
+// CORS configuration
+const whitelist = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:5173',
+  'https://crossover-helpdesk.onrender.com'
+];
+
 const corsOptions = {
-  origin: true, // Reflect the request origin
+  origin: function (origin, callback) {
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -24,7 +39,7 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// Log CORS requests in development
+// Logging middleware for development
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} from ${req.headers.origin || 'unknown origin'}`);
@@ -35,18 +50,17 @@ if (process.env.NODE_ENV !== 'production') {
 // Apply CORS with the above options
 app.use(cors(corsOptions));
 
-// Log incoming requests
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} from ${req.headers.origin || 'unknown origin'}`);
-  next();
-});
-
 // Explicitly handle preflight requests
 app.options('*', cors(corsOptions));
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', database: 'MySQL' });
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -100,28 +114,33 @@ app.use((error, req, res, next) => {
 
 // Start server function
 const startServer = async () => {
+  let server;
+  
   try {
     // Initialize database first
+    console.log('🔄 Initializing database...');
     await initializeDatabase();
+    console.log('✅ Database initialized successfully');
 
     // Start the server
-    const server = app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       console.log(`✅ Server is running on http://localhost:${PORT}`);
-      console.log(
-        `✅ CORS enabled for: http://localhost:3000, http://localhost:3001, http://localhost:5173`
-      );
       console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
+      if (process.env.CORS_ORIGINS) {
+        console.log(`✅ CORS enabled for: ${process.env.CORS_ORIGINS}`);
+      } else {
+        console.log('⚠️  CORS is enabled for all origins (not recommended for production)');
+      }
     });
 
     // Handle server errors
     server.on("error", (error) => {
       if (error.code === "EADDRINUSE") {
         console.error(`❌ Port ${PORT} is already in use`);
-        process.exit(1);
       } else {
         console.error("❌ Server error:", error);
-        process.exit(1);
       }
+      process.exit(1);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
@@ -129,23 +148,41 @@ const startServer = async () => {
   }
 };
 
-// Graceful shutdown
-const gracefulShutdown = () => {
-  console.log("🔄 Shutting down server gracefully...");
-  process.exit(0);
+// Graceful shutdown handler
+const gracefulShutdown = async () => {
+  console.log("\n🔄 Shutting down server gracefully...");
+  
+  try {
+    // Close database connections
+    console.log('🔒 Closing database connections...');
+    await closeDatabase();
+    console.log('✅ Database connections closed');
+    
+    // Exit with success
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
 };
 
+// Handle various termination signals
 process.on("SIGINT", gracefulShutdown);
 process.on("SIGTERM", gracefulShutdown);
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
 });
 
+// Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
+  console.error("❌ Uncaught Exception:", error);
+  gracefulShutdown().then(() => process.exit(1));
+});
+
+// Start the server
+startServer().catch(error => {
+  console.error("❌ Failed to start server:", error);
   process.exit(1);
 });
-
-startServer();

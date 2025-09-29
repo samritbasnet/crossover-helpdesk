@@ -10,8 +10,8 @@ import {
   Typography,
 } from "@mui/material";
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate, Link } from "react-router-dom";
 
 const Login = () => {
   // State for form data
@@ -139,18 +139,28 @@ const Login = () => {
               value={formData.password}
               onChange={handleChange}
               disabled={loading}
-              helperText="At least 6 characters"
             />
-
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
+              color="primary"
               disabled={loading}
+              sx={{ mt: 3, mb: 1 }}
             >
-              {loading ? <CircularProgress size={24} /> : "Sign In"}
+              {loading ? <CircularProgress size={24} /> : 'Sign In'}
             </Button>
+            <Box textAlign="center" mt={1}>
+              <Button 
+                component={Link}
+                to="/reset-password"
+                color="primary" 
+                size="small"
+                sx={{ textTransform: 'none' }}
+              >
+                Forgot Password?
+              </Button>
+            </Box>
 
             <Box textAlign="center">
               <Typography variant="body2">

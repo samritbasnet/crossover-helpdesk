@@ -3,33 +3,25 @@ import axios from "axios";
 
 // API configuration - determines base URL based on environment
 const getApiConfig = () => {
-  // Always use the environment variable if set
-  if (process.env.REACT_APP_API_BASE) {
-    console.log('Using REACT_APP_API_BASE:', process.env.REACT_APP_API_BASE);
-    return { 
-      baseURL: process.env.REACT_APP_API_BASE,
-      withCredentials: true
-    };
-  }
-
-  // Default to local development server
-  const baseURL = 'http://localhost:3000/api';
-  console.log('Development mode - using:', baseURL);
-  return { 
+  // In production, use relative URLs to leverage the Netlify proxy
+  // In development, use the full URL with the correct port
+  const isProduction = process.env.NODE_ENV === 'production';
+  const baseURL = isProduction ? '/api' : 'http://localhost:3000/api';
+  
+  return {
     baseURL,
-    withCredentials: true
+    timeout: 30000,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    // Ensure credentials are sent with requests in production
+    withCredentials: isProduction
   };
 };
 
 // Create axios instance with configuration
-const api = axios.create({
-  ...getApiConfig(),
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-});
+const api = axios.create(getApiConfig());
 
 // Request interceptor - add auth token to requests
 api.interceptors.request.use(
@@ -60,14 +52,21 @@ api.interceptors.response.use(
     if (process.env.NODE_ENV !== 'production') {
       console.log('API Success:', response.config.url, response.status);
     }
-    return response;
+    
+    // Return the data directly for easier access
+    return response.data;
   },
   (error) => {
-    console.error('API Error:', {
+    // Extract error details
+    const errorDetails = {
       url: error.config?.url,
       status: error.response?.status,
-      message: error.response?.data?.message || error.message
-    });
+      message: error.response?.data?.message || error.message,
+      response: error.response?.data,
+      originalError: error
+    };
+    
+    console.error('API Error:', errorDetails);
 
     // Handle authentication errors
     if (error.response?.status === 401) {
@@ -80,137 +79,98 @@ api.interceptors.response.use(
       }
     }
 
-    // Return user-friendly error
-    const errorMessage = error.response?.data?.message ||
-                        error.message ||
-                        'Something went wrong. Please try again.';
-
+    // Return a consistent error object
     return Promise.reject({
-      message: errorMessage,
+      message: error.response?.data?.message || 
+              error.message || 
+              'Something went wrong. Please try again.',
       status: error.response?.status,
       data: error.response?.data,
+      isAxiosError: error.isAxiosError
     });
   }
 );
 
-// Authentication API calls
 export const authAPI = {
   // User registration
-  signup: async (userData) => {
-    const response = await api.post("/auth/register", userData);
-    return response.data;
-  },
-
+  signup: (userData) => api.post("/auth/register", userData),
+  
   // User login
-  login: async (credentials) => {
-    const response = await api.post("/auth/login", credentials);
-    return response.data;
-  },
-
+  login: (credentials) => api.post("/auth/login", credentials),
+  
+  // Request password reset
+  requestPasswordReset: (emailData) => 
+    api.post("/auth/request-password-reset", emailData),
+  
+  // Reset password with token
+  resetPassword: (passwordData) => 
+    api.post("/auth/reset-password", passwordData),
+    
   // Verify current user session
-  getCurrentUser: async () => {
-    const response = await api.get("/auth/verify");
-    return response.data;
-  },
+  getCurrentUser: () => api.get("/auth/me"),
 };
 
 // Tickets API calls
 export const ticketsAPI = {
   // Get tickets with optional filters
-  getTickets: async (filters = {}) => {
-    const response = await api.get("/tickets", { params: filters });
-    return response.data;
-  },
+  getTickets: (filters = {}) => api.get("/tickets", { params: filters }),
 
   // Get single ticket
-  getTicket: async (id) => {
-    const response = await api.get(`/tickets/${id}`);
-    return response.data;
-  },
+  getTicket: (id) => api.get(`/tickets/${id}`),
 
   // Create new ticket
-  createTicket: async (ticketData) => {
-    const response = await api.post("/tickets", ticketData);
-    return response.data;
-  },
+  createTicket: (ticketData) => api.post("/tickets", ticketData),
 
   // Update ticket
-  updateTicket: async (id, ticketData) => {
-    const response = await api.put(`/tickets/${id}`, ticketData);
-    return response.data;
-  },
+  updateTicket: (id, ticketData) => api.put(`/tickets/${id}`, ticketData),
 
   // Delete ticket
-  deleteTicket: async (id) => {
-    const response = await api.delete(`/tickets/${id}`);
-    return response.data;
-  },
+  deleteTicket: (id) => api.delete(`/tickets/${id}`),
 };
 
 // Knowledge Base API calls
 export const knowledgeAPI = {
   // Get knowledge articles
-  getArticles: async (filters = {}) => {
-    const response = await api.get("/knowledge", { params: filters });
-    return response.data;
-  },
+  getArticles: (filters = {}) => api.get("/knowledge", { params: filters }),
 
   // Get single article
-  getArticle: async (id) => {
-    const response = await api.get(`/knowledge/${id}`);
-    return response.data;
-  },
+  getArticle: (id) => api.get(`/knowledge/${id}`),
 
   // Create new article
-  createArticle: async (articleData) => {
-    const response = await api.post("/knowledge", articleData);
-    return response.data;
-  },
+  createArticle: (articleData) => api.post("/knowledge", articleData),
 
   // Update article
-  updateArticle: async (id, articleData) => {
-    const response = await api.put(`/knowledge/${id}`, articleData);
-    return response.data;
-  },
+  updateArticle: (id, articleData) => api.put(`/knowledge/${id}`, articleData),
 
   // Delete article
-  deleteArticle: async (id) => {
-    const response = await api.delete(`/knowledge/${id}`);
-    return response.data;
-  },
+  deleteArticle: (id) => api.delete(`/knowledge/${id}`),
 
   // Mark article as helpful
-  markHelpful: async (id) => {
-    const response = await api.post(`/knowledge/${id}/helpful`);
-    return response.data;
-  },
+  markHelpful: (id) => api.post(`/knowledge/${id}/helpful`),
 };
 
 // User management API calls
 export const userAPI = {
   // Get user profile
-  getProfile: async () => {
-    const response = await api.get("/users/profile");
-    return response.data;
-  },
+  getProfile: () => api.get("/users/profile"),
 
   // Update user profile
-  updateProfile: async (profileData) => {
-    const response = await api.put("/users/profile", profileData);
-    return response.data;
-  },
+  updateProfile: (profileData) => api.put("/users/profile", profileData),
 
   // Update email preferences
-  updatePreferences: async (preferences) => {
-    const response = await api.put("/users/preferences", preferences);
-    return response.data;
-  },
+  updatePreferences: (preferences) => api.put("/users/preferences", { preferences }),
 
   // Get all users (admin only)
-  getAllUsers: async (filters = {}) => {
-    const response = await api.get("/users", { params: filters });
-    return response.data;
-  },
+  getAllUsers: (filters = {}) => api.get("/users", { params: filters }),
+
+  // Create a new user (admin only)
+  createUser: (userData) => api.post("/users", userData),
+
+  // Update a user (admin only)
+  updateUser: (userId, userData) => api.put(`/users/${userId}`, userData),
+
+  // Delete a user (admin only)
+  deleteUser: (userId) => api.delete(`/users/${userId}`),
 };
 
 export default api;

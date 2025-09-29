@@ -102,10 +102,16 @@ export const AuthProvider = ({ children }) => {
   const signup = async (userData) => {
     try {
       const response = await authAPI.signup(userData);
-      const { token: newToken, user: newUser } = response;
+      
+      // The response data is in response.data
+      const responseData = response.data || response;
+      
+      // Extract token and user from response data
+      const { token: newToken, user: newUser } = responseData;
 
       if (!newToken || !newUser) {
-        throw new Error("Invalid signup response");
+        console.error('Invalid signup response structure:', response);
+        throw new Error("Invalid signup response from server");
       }
 
       // Store new user session
@@ -117,10 +123,10 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true };
     } catch (error) {
-      console.error("Signup failed:", error.message);
+      console.error("Signup failed:", error);
       return {
         success: false,
-        message: error.message || "Signup failed. Please try again.",
+        message: error.response?.data?.message || error.message || "Signup failed. Please try again.",
       };
     }
   };

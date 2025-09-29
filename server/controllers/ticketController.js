@@ -1,12 +1,6 @@
 // controllers/ticketController.js - Ticket business logic
 const { getDatabase } = require("../config/database");
-const {
-  notifyTicketCreated,
-  notifyTicketUpdated,
-  notifyTicketResolved,
-  notifyTicketAssigned,
-  notifyAgentAssigned
-} = require("../services/emailService");
+const { notifyTicketResolved } = require("../services/emailService");
 
 // Helper functions for database operations
 const runQuery = (query, params = []) => {
@@ -54,8 +48,7 @@ const createTicket = async (req, res) => {
     const {
       title,
       description,
-      priority = "medium",
-      category = "general",
+      priority = "medium"
     } = req.body;
     const userId = req.user.userId;
 
@@ -90,29 +83,49 @@ const createTicket = async (req, res) => {
       });
     }
 
-    // Create ticket
-    const result = await runQuery(
-      "INSERT INTO tickets (title, description, priority, category, user_id) VALUES (?, ?, ?, ?, ?)",
-      [title.trim(), description.trim(), priority, category.trim(), userId]
-    );
+    // Create ticket using direct database query
+    const db = getDatabase();
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        "INSERT INTO tickets (title, description, priority, user_id) VALUES (?, ?, ?, ?)",
+        [title.trim(), description.trim(), priority, userId],
+        function(err) {
+          if (err) {
+            console.error('Database error:', err);
+            reject(err);
+          } else {
+            resolve({ id: this.lastID });
+          }
+        }
+      );
+    });
 
     // Get the created ticket with user info including email preferences
-    const ticket = await getQuery(
-      `
-      SELECT t.*, u.name as user_name, u.email as user_email, u.email_notifications
-      FROM tickets t
-      JOIN users u ON t.user_id = u.id
-      WHERE t.id = ?
-    `,
-      [result.id]
-    );
+    const ticket = await new Promise((resolve, reject) => {
+      db.get(
+        `
+        SELECT t.*, u.name as user_name, u.email as user_email
+        FROM tickets t
+        JOIN users u ON t.user_id = u.id
+        WHERE t.id = ?
+        `,
+        [result.id],
+        (err, row) => {
+          if (err) {
+            console.error('Database error:', err);
+            reject(err);
+          } else {
+            resolve(row);
+          }
+        }
+      );
+    });
 
     // Send email notification to user
     try {
       const user = {
         name: ticket.user_name,
         email: ticket.user_email,
-        email_notifications: ticket.email_notifications
       };
       await notifyTicketCreated(ticket, user);
       console.log(`📧 Ticket creation notification sent to ${user.email}`);
@@ -130,7 +143,7 @@ const createTicket = async (req, res) => {
     console.error("Create ticket error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to create ticket. Please try again.",
+      message: error.message || "Failed to create ticket. Please try again.",
     });
   }
 };
@@ -410,13 +423,14 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Check permissions - Fixed logic
+    // Check permissions - Allow agents and admins to edit any ticket
     const userIdNum = parseInt(userId);
     const ticketUserId = parseInt(ticket.user_id);
     const assignedToId = ticket.assigned_to ? parseInt(ticket.assigned_to) : null;
     
     const canEdit =
       userRole === "admin" ||
+      userRole === "agent" ||
       ticketUserId === userIdNum ||
       (assignedToId && assignedToId === userIdNum);
 
@@ -424,7 +438,7 @@ const updateTicket = async (req, res) => {
       console.log(`Permission denied for user ${userId} (${userRole}) trying to edit ticket ${ticketId} owned by ${ticket.user_id}`);
       return res.status(403).json({
         success: false,
-        message: "Access denied. You can only edit your own tickets.",
+        message: "Access denied. You don't have permission to edit this ticket.",
       });
     }
 
@@ -572,18 +586,30 @@ const updateTicket = async (req, res) => {
 
       // Handle resolution notification
       if (status === 'resolved') {
-        await notifyTicketResolved(
-          updatedTicket,
-          ticketOwner,
-          { 
-            id: userId,
-            name: req.user.name,
-            email: req.user.email
-          },
-          resolution_notes
-        );
-        console.log(`📧 Resolution notification sent to ${ticketOwner.email}`);
-      } 
+        console.log('Preparing to send resolution notification...', {
+          ticketId: updatedTicket.id,
+          recipient: ticketOwner.email,
+          hasResolutionNotes: !!resolution_notes
+        });
+        
+        try {
+          await notifyTicketResolved(
+            updatedTicket,
+            ticketOwner,
+            { 
+              id: userId,
+              name: req.user.name,
+              email: req.user.email
+            },
+            resolution_notes
+          );
+          console.log(`✅ Resolution notification sent to ${ticketOwner.email}`);
+        } catch (emailError) {
+          console.error('❌ Failed to send resolution notification:', emailError);
+          // Don't fail the request if email fails
+          console.log('Continuing with ticket update despite email error');
+        }
+      }
       // Send general update notification if there were changes (but not for resolved tickets as they get special treatment)
       else if (changes.length > 0) {
         await notifyTicketUpdated(
@@ -612,9 +638,15 @@ const updateTicket = async (req, res) => {
     });
   } catch (error) {
     console.error("Update ticket error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      sqlMessage: error.sqlMessage
+    });
     res.status(500).json({
       success: false,
-      message: "Failed to update ticket. Please try again.",
+      message: `Failed to update ticket: ${error.message}`,
     });
   }
 };

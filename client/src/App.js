@@ -11,6 +11,7 @@ import {
 import UpdateTicket from "./components/Agent/UpdateTicket";
 import Login from "./components/Auth/Login";
 import Signup from "./components/Auth/Signup";
+import ResetPassword from "./components/Auth/ResetPassword";
 import Loading from "./components/common/Loading";
 import ArticleDetail from "./components/Knowledge/ArticleDetail";
 import Navbar from "./components/Layout/Navbar";
@@ -23,7 +24,17 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import UserDashboard from "./pages/UserDashboard";
+import SupportManagement from "./pages/SupportManagement";
 import { USER_ROLES } from "./utils/constants";
+
+// Public routes configuration
+const publicRoutes = [
+  { path: "/login", element: <Login /> },
+  { path: "/signup", element: <Signup /> },
+  { path: "/reset-password", element: <ResetPassword /> },
+  { path: "/knowledge", element: <KnowledgeBase /> },
+  { path: "/knowledge/:id", element: <ArticleDetail /> }
+];
 
 // Create Material-UI theme
 const theme = createTheme({
@@ -66,32 +77,26 @@ const PublicRoute = ({ children }) => {
 // Main App Routes
 const AppRoutes = () => {
   return (
-    <Router>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <AuthProvider>
+    <ThemeProvider theme={theme}>
+      <AuthProvider>
+        <Router>
           <Navbar />
           <Routes>
             {/* Default route redirects to login */}
             <Route path="/" element={<Navigate to="/login" replace />} />
             
-            {/* Public Routes */}
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/signup"
-              element={
-                <PublicRoute>
-                  <Signup />
-                </PublicRoute>
-              }
-            />
+            {/* Public routes */}
+            {publicRoutes.map(({ path, element }) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <PublicRoute>
+                    {element}
+                  </PublicRoute>
+                }
+              />
+            ))}
 
             {/* Protected Routes */}
             <Route
@@ -152,6 +157,14 @@ const AppRoutes = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/support-management"
+              element={
+                <ProtectedRoute>
+                  <SupportManagement />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Default Route */}
             <Route path="/" element={<Navigate to="/dashboard" />} />
@@ -159,9 +172,9 @@ const AppRoutes = () => {
             {/* 404 Route - Must be last */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
-      </ThemeProvider>
-    </Router>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

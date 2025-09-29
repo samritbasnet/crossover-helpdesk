@@ -34,12 +34,35 @@ const UserDashboard = () => {
     try {
       setLoading(true);
       setError("");
+      
+      console.log('Fetching tickets...');
       const response = await ticketsAPI.getTickets();
-      // Backend returns: { success: true, tickets: [...], pagination: {...}, stats: {...} }
-      setTickets(response.tickets || []);
+      
+      // Debug log the entire response
+      console.log('Tickets API Response:', response);
+      
+      // The API returns { success, tickets, pagination, stats }
+      // But due to our axios interceptor, response is already the data object
+      if (response && response.success) {
+        if (Array.isArray(response.tickets)) {
+          console.log('Successfully loaded tickets:', response.tickets.length);
+          setTickets(response.tickets);
+          
+          // You can also store pagination and stats if needed
+          // setPagination(response.pagination);
+          // setStats(response.stats);
+        } else {
+          console.warn('Tickets array is missing or invalid in response:', response);
+          setTickets([]);
+        }
+      } else {
+        console.warn('API request was not successful:', response);
+        setTickets([]);
+      }
     } catch (err) {
       console.error("Load tickets error:", err);
       setError(getErrorMessage(err));
+      setTickets([]); // Reset tickets on error
     } finally {
       setLoading(false);
     }
@@ -82,7 +105,7 @@ const UserDashboard = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid xs={12} sm={6} md={3}>
           <StatsCard
             icon={Support}
             title="Total Tickets"
@@ -90,7 +113,7 @@ const UserDashboard = () => {
             color="primary"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid xs={12} sm={6} md={3}>
           <StatsCard
             icon={Support}
             title="Open Tickets"
@@ -98,7 +121,7 @@ const UserDashboard = () => {
             color="warning"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid xs={12} sm={6} md={3}>
           <StatsCard
             icon={Support}
             title="In Progress"
@@ -106,7 +129,7 @@ const UserDashboard = () => {
             color="info"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid xs={12} sm={6} md={3}>
           <StatsCard
             icon={Support}
             title="Resolved"
@@ -134,7 +157,7 @@ const UserDashboard = () => {
       ) : (
         <Grid container spacing={2}>
           {tickets.slice(0, 6).map((ticket) => (
-            <Grid item xs={12} md={6} key={ticket.id}>
+            <Grid xs={12} md={6} key={ticket.id}>
               <TicketCard ticket={ticket} />
             </Grid>
           ))}

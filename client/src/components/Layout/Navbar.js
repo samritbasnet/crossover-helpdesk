@@ -64,6 +64,15 @@ const Navbar = () => {
       });
     }
 
+    // Add Admin menu items
+    if (user?.role === 'admin') {
+      baseItems.push({
+        label: "Support Management",
+        path: "/support-management",
+        icon: <Support />,
+      });
+    }
+
     return baseItems;
   };
 

@@ -1,6 +1,6 @@
 // routes/users.js - User management routes
 const express = require("express");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const { getDatabase } = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 

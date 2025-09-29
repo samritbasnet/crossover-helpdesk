@@ -32,8 +32,11 @@ const Signup = () => {
   const [error, setError] = useState("");
 
   // Hooks
-  const { signup } = useAuth();
+  const { signup, user } = useAuth();
   const navigate = useNavigate();
+  
+  // Determine if current user is admin
+  const isAdmin = user?.role === 'admin';
 
   // Handle input changes
   const handleChange = (e) => {
@@ -167,15 +170,19 @@ const Signup = () => {
                 value={formData.role}
                 label="Role"
                 onChange={handleChange}
+                disabled={loading || (formData.role === 'admin' && !isAdmin)}
               >
                 <MenuItem value="user">User (Submit tickets)</MenuItem>
-                <MenuItem value="agent">
-                  Support Agent (Resolve tickets)
-                </MenuItem>
-                <MenuItem value="admin">
-                  Admin (Manage all tickets)
-                </MenuItem>
+                <MenuItem value="agent">Support Agent (Resolve tickets)</MenuItem>
+                {isAdmin && (
+                  <MenuItem value="admin">Admin (Manage all tickets)</MenuItem>
+                )}
               </Select>
+              {!isAdmin && formData.role === 'admin' && (
+                <Typography variant="caption" color="error">
+                  Only administrators can create admin accounts
+                </Typography>
+              )}
             </FormControl>
 
             <TextField
