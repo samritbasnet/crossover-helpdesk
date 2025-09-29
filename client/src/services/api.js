@@ -3,11 +3,10 @@ import axios from "axios";
 
 // API configuration - determines base URL based on environment
 const getApiConfig = () => {
-  // In production, use the full backend URL
-  // In development, use the local server
+  // Always use the full URL with /api prefix
   const baseURL = process.env.NODE_ENV === 'production'
-    ? 'https://crossover-helpdesk.onrender.com/api'
-    : 'http://localhost:3000/api';
+    ? 'https://crossover-helpdesk.onrender.com/api'  // Production API
+    : 'http://localhost:3000/api';                  // Local development API
   
   console.log(`API Configuration - Base URL: ${baseURL}`);
   
@@ -121,7 +120,15 @@ export const authAPI = {
   signup: (userData) => api.post("/auth/register", userData),
   
   // User login
-  login: (credentials) => api.post("/auth/login", credentials),
+  login: (credentials) => api.post("/auth/login", credentials, {
+    // Explicitly set headers for login to avoid any caching issues
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  }),
   
   // Request password reset
   requestPasswordReset: (emailData) => 
@@ -132,7 +139,7 @@ export const authAPI = {
     api.post("/auth/reset-password", passwordData),
     
   // Verify current user session
-  getCurrentUser: () => api.get("/auth/verify"),  // Changed from /auth/me to /auth/verify to match backend
+  getCurrentUser: () => api.get("/auth/verify"),
 };
 
 // Tickets API calls
