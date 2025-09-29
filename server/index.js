@@ -87,7 +87,7 @@ app.use("/api/tickets", require("./routes/tickets"));
 // User routes
 app.use("/api/users", require("./routes/users"));
 
-// Knowledge routes (SQLite-based)
+// Knowledge base routes
 app.use("/api/knowledge", require("./routes/knowledge"));
 
 // Test route to verify server is working
