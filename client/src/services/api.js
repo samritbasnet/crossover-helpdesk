@@ -6,17 +6,29 @@ const getApiConfig = () => {
   // In production, use relative URLs to leverage the Netlify proxy
   // In development, use the full URL with the correct port
   const isProduction = process.env.NODE_ENV === 'production';
-  const baseURL = isProduction ? '/api' : 'http://localhost:3000/api';
+  
+  // For production, use relative URL to leverage Netlify proxy
+  // For development, use the full backend URL
+  const baseURL = isProduction 
+    ? '/api'  // This will be proxied to the backend by Netlify
+    : 'http://localhost:3000/api';
+  
+  console.log(`API Configuration - Environment: ${process.env.NODE_ENV}, Base URL: ${baseURL}`);
   
   return {
     baseURL,
     timeout: 30000,
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     },
-    // Ensure credentials are sent with requests in production
-    withCredentials: isProduction
+    // Ensure credentials are sent with requests
+    withCredentials: true,
+    // Add response type
+    responseType: 'json'
   };
 };
 
@@ -36,58 +48,74 @@ api.interceptors.request.use(
       console.log('API Request:', {
         method: config.method?.toUpperCase(),
         url: config.url,
-        fullURL: config.baseURL + config.url
       });
     }
 
     return config;
   },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor - handle common errors
-api.interceptors.response.use(
-  (response) => {
-    // Log successful responses in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('API Success:', response.config.url, response.status);
-    }
-    
-    // Return the data directly for easier access
-    return response.data;
-  },
   (error) => {
-    // Extract error details
-    const errorDetails = {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.response?.data?.message || error.message,
-      response: error.response?.data,
-      originalError: error
-    };
-    
-    console.error('API Error:', errorDetails);
-
-    // Handle authentication errors
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-
-      // Redirect to login if not already there
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = "/login?session_expired=true";
-      }
+    // Log the full error in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('API Error:', {
+        message: error.message,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+          data: error.config?.data
+        },
+        response: error.response?.data,
+        status: error.response?.status,
+        stack: error.stack
+      });
     }
 
-    // Return a consistent error object
-    return Promise.reject({
-      message: error.response?.data?.message || 
-              error.message || 
-              'Something went wrong. Please try again.',
-      status: error.response?.status,
-      data: error.response?.data,
-      isAxiosError: error.isAxiosError
-    });
+    if (error.response) {
+      // Server responded with a status code outside 2xx
+      const { status, data } = error.response;
+      let errorMessage = data?.message || 'An error occurred';
+      
+      // Handle specific status codes
+      if (status === 401) {
+        errorMessage = 'Your session has expired. Please log in again.';
+        // Clear auth data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login?session_expired=true';
+        }
+      } else if (status === 403) {
+        errorMessage = 'You do not have permission to access this resource.';
+      } else if (status === 404) {
+        errorMessage = `The requested resource was not found: ${error.config.url}`;
+      } else if (status >= 500) {
+        errorMessage = 'Server error. Please try again later.';
+      }
+      
+      return Promise.reject({
+        message: errorMessage,
+        status,
+        data,
+        url: error.config.url,
+        isNetworkError: false
+      });
+    } else if (error.request) {
+      // Request was made but no response received
+      console.error('Network Error - No response received from server');
+      return Promise.reject({
+        message: 'Unable to connect to the server. Please check your internet connection and try again.',
+        isNetworkError: true
+      });
+    } else {
+      // Something happened in setting up the request
+      console.error('Request Error:', error.message);
+      return Promise.reject({
+        message: `Request failed: ${error.message}`,
+        isNetworkError: false,
+        isAxiosError: error.isAxiosError
+      });
+    }
   }
 );
 
@@ -107,7 +135,7 @@ export const authAPI = {
     api.post("/auth/reset-password", passwordData),
     
   // Verify current user session
-  getCurrentUser: () => api.get("/auth/me"),
+  getCurrentUser: () => api.get("/auth/verify"),  // Changed from /auth/me to /auth/verify to match backend
 };
 
 // Tickets API calls

@@ -27,13 +27,17 @@ import UserDashboard from "./pages/UserDashboard";
 import SupportManagement from "./pages/SupportManagement";
 import { USER_ROLES } from "./utils/constants";
 
+// Import the API test page
+import ApiTest from "./pages/ApiTest";
+
 // Public routes configuration
 const publicRoutes = [
   { path: "/login", element: <Login /> },
   { path: "/signup", element: <Signup /> },
   { path: "/reset-password", element: <ResetPassword /> },
   { path: "/knowledge", element: <KnowledgeBase /> },
-  { path: "/knowledge/:id", element: <ArticleDetail /> }
+  { path: "/knowledge/:id", element: <ArticleDetail /> },
+  { path: "/api-test", element: <ApiTest /> }
 ];
 
 // Create Material-UI theme
