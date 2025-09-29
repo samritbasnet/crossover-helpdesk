@@ -3,7 +3,8 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const { initializeDatabase, closeDatabase } = require("./config/database");
+const { initializeDatabase, closeDatabase, getConnection } = require("./config/database");
+const { initDatabase } = require("./utils/dbInit");
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -118,9 +119,19 @@ const startServer = async () => {
   let server;
   
   try {
-    // Initialize database first
+    // Initialize database connection and schema
     console.log('🔄 Initializing database...');
     await initializeDatabase();
+    
+    // In production, ensure database schema is initialized
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Running in production mode - initializing database schema...');
+      const dbInitialized = await initDatabase();
+      if (!dbInitialized) {
+        throw new Error('Failed to initialize database schema');
+      }
+    }
+    
     console.log('✅ Database initialized successfully');
 
     // Start the server
