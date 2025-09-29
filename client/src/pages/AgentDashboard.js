@@ -57,8 +57,15 @@ const LoadingSkeleton = () => (
 
 const AgentDashboard = () => {
   const { user } = useAuth();
-  const isAgent = user?.role === 'agent' || user?.role === 'admin';
   const navigate = useNavigate();
+  
+  // Define agent access check at the top level
+  const isAgent = user?.role === 'agent' || user?.role === 'admin';
+  const hasAgentAccess = Boolean(user && (user.role === 'agent' || user.role === 'admin'));
+  
+  // Debug log to check user role
+  console.log('Current user role:', user?.role);
+  console.log('hasAgentAccess:', hasAgentAccess);
 
   // State management
   const [tickets, setTickets] = useState([]);
@@ -89,10 +96,10 @@ const AgentDashboard = () => {
 
   // Load tickets on component mount
   useEffect(() => {
-    if (isAgent()) {
+    if (hasAgentAccess) {
       loadTickets();
     }
-  }, [isAgent, loadTickets]);
+  }, [hasAgentAccess, loadTickets]);
 
   // Update ticket status
   const updateTicketStatus = async (ticketId, newStatus) => {
@@ -214,11 +221,11 @@ const AgentDashboard = () => {
   };
 
   // Redirect if not an agent
-  if (!isAgent()) {
+  if (!hasAgentAccess) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4 }}>
         <Alert severity="error">
-          You don't have permission to access this page.
+          You don't have permission to access this page. Please contact an administrator if you believe this is an error.
         </Alert>
       </Container>
     );

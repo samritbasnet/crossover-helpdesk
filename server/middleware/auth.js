@@ -1,16 +1,16 @@
-// middleware/auth.js - Simple authentication middleware
+// middleware/auth.js - Authentication middleware with MySQL
 const jwt = require("jsonwebtoken");
-const { getDatabase } = require("../config/database");
+const { getQuery } = require("../config/database");
 
-// Simple database query helper
-const dbQuery = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    const db = getDatabase();
-    db.get(query, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+// Database query helper for MySQL
+const dbQuery = async (query, params = []) => {
+  try {
+    const rows = await getQuery(query, params);
+    return rows || null;
+  } catch (error) {
+    console.error('Database query error:', error);
+    throw error;
+  }
 };
 
 // Main authentication middleware - checks JWT tokens

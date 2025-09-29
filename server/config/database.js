@@ -1,84 +1,81 @@
 // config/database.js - MySQL database setup
 const mysql = require('mysql2/promise');
-const { query, getOne, execute, testConnection, initializeDatabase } = require('./mysql-config');
+require('dotenv').config();
+
+// Database configuration
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'crossover_user',
+  password: process.env.DB_PASSWORD || 'AppSecurePassword123!',
+  database: process.env.DB_NAME || 'crossover_helpdesk',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+};
+
+// Create a connection pool
+const pool = mysql.createPool(dbConfig);
+
+// Test the database connection
+const testConnection = async () => {
+  try {
+    const connection = await pool.getConnection();
+    console.log('Successfully connected to MySQL database');
+    connection.release();
+    return true;
+  } catch (error) {
+    console.error('Error connecting to MySQL database:', error);
+    return false;
+  }
+};
 
 // Export the MySQL helper functions
 module.exports = {
-  // Initialize the database connection and create tables if they don't exist
+  // Initialize the database connection
   async initializeDatabase() {
     const isConnected = await testConnection();
     if (!isConnected) {
       throw new Error('Failed to connect to MySQL database');
     }
-    
-    await initializeDatabase();
     return true;
   },
   
-  // Get a database connection (for compatibility with existing code)
+  // Get the database connection (for compatibility with existing code)
   getDatabase() {
-    return {
-      run: async (sql, params, callback) => {
-        try {
-          const result = await execute(sql, params);
-          callback(null, { lastID: result.insertId, changes: result.affectedRows });
-        } catch (error) {
-          callback(error);
-        }
-      },
-      
-      get: async (sql, params, callback) => {
-        try {
-          const row = await getOne(sql, params);
-          callback(null, row);
-        } catch (error) {
-          callback(error);
-        }
-      },
-      
-      all: async (sql, params, callback) => {
-        try {
-          const rows = await query(sql, params);
-          callback(null, rows);
-        } catch (error) {
-          callback(error);
-        }
-      }
-    };
+    return pool;
   },
   
   // Helper functions for database operations
-  runQuery: async (sql, params = []) => {
-    try {
-      const result = await execute(sql, params);
-      return { id: result.insertId, changes: result.affectedRows };
-    } catch (error) {
-      console.error('Database runQuery error:', error);
-      throw error;
-    }
+  async runQuery(sql, params = []) {
+    const [result] = await pool.execute(sql, params);
+    return { insertId: result.insertId, affectedRows: result.affectedRows };
   },
   
-  getQuery: async (sql, params = []) => {
-    try {
-      return await getOne(sql, params);
-    } catch (error) {
-      console.error('Database getQuery error:', error);
-      throw error;
-    }
+  async getQuery(sql, params = []) {
+    const [rows] = await pool.execute(sql, params);
+    return rows[0] || null;
   },
   
-  getAllQuery: async (sql, params = []) => {
-    try {
-      return await query(sql, params);
-    } catch (error) {
-      console.error('Database getAllQuery error:', error);
-      throw error;
-    }
+  async getAllQuery(sql, params = []) {
+    const [rows] = await pool.execute(sql, params);
+    return rows || [];
   },
   
-  // Close the database connection pool
+  // Close the database connection
   async closeDatabase() {
-    const { pool } = require('./mysql-config');
     await pool.end();
-  }
+    return true;
+  },
+  
+  // Alias for compatibility
+  query: (sql, params) => {
+    if (sql.trim().toUpperCase().startsWith('SELECT')) {
+      return pool.execute(sql, params).then(([rows]) => rows);
+    }
+    return pool.execute(sql, params).then(([result]) => result);
+  },
+  
+  getOne: (sql, params) => pool.execute(sql, params).then(([rows]) => rows[0] || null),
+  
+  execute: (sql, params) => pool.execute(sql, params).then(([result]) => result)
 };

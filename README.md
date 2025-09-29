@@ -14,23 +14,44 @@ A modern, full-stack helpdesk and ticketing system built with React and Node.js.
 
 ---
 
-🗂 Project Structure
+## 🗂 Project Structure
 
+```
 crossover-helpdesk/
 ├── client/        # React frontend
-└── server/        # Express backend (sqlite3)
+└── server/        # Express backend with MySQL
 ```
 
-🔧 Quick Start
+## 🚀 Quick Start
 
-1) **Server Setup**
+### Prerequisites
+- Node.js (v14+)
+- MySQL (v5.7+ or MariaDB 10.3+)
+- npm or yarn
+
+### 1. Database Setup
+
+1. Create a MySQL database:
+   ```sql
+   CREATE DATABASE crossover_helpdesk CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+2. Create a MySQL user and grant privileges:
+   ```sql
+   CREATE USER 'crossover_user'@'localhost' IDENTIFIED BY 'your_secure_password';
+   GRANT ALL PRIVILEGES ON crossover_helpdesk.* TO 'crossover_user'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+
+### 2. Server Setup
 
 ```bash
 cd server
 npm install
-cp .env.example .env  # Copy environment template
-# Edit .env file with your settings
-npm run dev           # starts at http://localhost:3000
+cp .env.example .env
+# Edit .env file with your MySQL credentials
+npm run migrate    # Run database migrations
+npm run dev       # Start the server at http://localhost:3000
 ```
 
 2) **Client Setup**

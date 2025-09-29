@@ -46,8 +46,24 @@ async function setupEmailTransporter() {
 // Initialize the transporter
 setupEmailTransporter()
   .then(t => {
+    console.log('Email transporter initialized:', t ? 'Success' : 'Failed');
     transporter = t;
     if (transporter) {
+      // Verify connection configuration
+      console.log('Email service configured with the following settings:');
+      console.log('- Host:', transporter.options.host);
+      console.log('- Port:', transporter.options.port);
+      console.log('- Secure:', transporter.options.secure);
+      console.log('- User:', transporter.options.auth?.user);
+      
+      // Verify connection works
+      transporter.verify(function(error, success) {
+        if (error) {
+          console.error('Email server connection failed:', error);
+        } else {
+          console.log('Email server is ready to take our messages');
+        }
+      });
       console.log('Email transporter initialized');
       
       // Log test account info for development

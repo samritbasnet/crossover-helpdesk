@@ -12,7 +12,7 @@
     "build": "echo 'No build step needed for Node.js'",
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate": "node migrate.js",
-    "reset-db": "node -e \"require('fs').unlinkSync('./helpdesk.db', () => {}); console.log('Database reset')\""
+    "check-db": "node checkDb.js"
   },
   "keywords": [
     "helpdesk",

@@ -30,7 +30,7 @@ const initializeDatabase = async () => {
     console.log(`✓ Database '${DATABASE_NAME}' ready`);
 
     // Switch to the database
-    await connection.execute(`USE \`${DATABASE_NAME}\``);
+    await connection.query(`USE \`${DATABASE_NAME}\``);
     console.log(`✓ Using database '${DATABASE_NAME}'`);
 
     // Drop existing tables (for clean setup)

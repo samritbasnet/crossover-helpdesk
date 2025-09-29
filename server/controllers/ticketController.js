@@ -1,45 +1,44 @@
 // controllers/ticketController.js - Ticket business logic
-const { getDatabase } = require("../config/database");
+const { 
+  runQuery: dbRunQuery, 
+  getQuery: dbGetQuery, 
+  getAllQuery: dbGetAllQuery,
+  execute: dbExecute
+} = require("../config/database");
 const { notifyTicketResolved } = require("../services/emailService");
 
 // Helper functions for database operations
-const runQuery = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    const db = getDatabase();
-    db.run(query, params, function (err) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve({ id: this.lastID, changes: this.changes });
-      }
-    });
-  });
+const runQuery = async (query, params = []) => {
+  try {
+    const result = await dbRunQuery(query, params);
+    return { 
+      id: result.insertId, 
+      changes: result.affectedRows 
+    };
+  } catch (error) {
+    console.error('Error in runQuery:', error);
+    throw error;
+  }
 };
 
-const getQuery = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    const db = getDatabase();
-    db.get(query, params, (err, row) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(row);
-      }
-    });
-  });
+const getQuery = async (query, params = []) => {
+  try {
+    const row = await dbGetQuery(query, params);
+    return row || null;
+  } catch (error) {
+    console.error('Error in getQuery:', error);
+    throw error;
+  }
 };
 
-const getAllQuery = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    const db = getDatabase();
-    db.all(query, params, (err, rows) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(rows);
-      }
-    });
-  });
+const getAllQuery = async (query, params = []) => {
+  try {
+    const rows = await dbGetAllQuery(query, params);
+    return rows || [];
+  } catch (error) {
+    console.error('Error in getAllQuery:', error);
+    throw error;
+  }
 };
 
 // Create a new ticket
@@ -183,6 +182,9 @@ const getTickets = async (req, res) => {
     if (userRole === "user") {
       conditions.push("t.user_id = ?");
       params.push(parseInt(userId));
+    } else if (userRole === "agent") {
+      // Agents can see all tickets
+      // No additional conditions needed
     }
 
     // Add filters
@@ -245,6 +247,9 @@ const getTickets = async (req, res) => {
     if (userRole === "user") {
       countConditions.push("t.user_id = ?");
       countParams.push(parseInt(userId));
+    } else if (userRole === "agent") {
+      // Agents can see all tickets
+      // No additional conditions needed
     }
 
     if (status) {
@@ -471,7 +476,7 @@ const updateTicket = async (req, res) => {
     }
 
     // Only admins and assigned agents can change status and assignment
-    if (userRole === "admin" || userRole === "agent" || ticket.assigned_to === userId) {
+    if (userRole === "admin" || userRole === "agent" || ticket.assigned_to === userIdNum) {
       if (status !== undefined) {
         const validStatuses = ["open", "in-progress", "resolved", "closed"];
         if (validStatuses.includes(status)) {
@@ -488,7 +493,7 @@ const updateTicket = async (req, res) => {
           
           // If resolving, update resolved_at timestamp
           if (status === 'resolved') {
-            updateFields.push("resolved_at = CURRENT_TIMESTAMP");
+            updateFields.push("resolved_at = NOW()");
             updateFields.push("resolution_notes = ?");
             params.push(resolution_notes);
           }
@@ -510,13 +515,23 @@ const updateTicket = async (req, res) => {
     }
 
     // Always update the timestamp
-    updateFields.push("updated_at = CURRENT_TIMESTAMP");
+    updateFields.push("updated_at = NOW()");
     params.push(ticketId);
 
     const updateQuery = `UPDATE tickets SET ${updateFields.join(
       ", "
     )} WHERE id = ?`;
-    await runQuery(updateQuery, params);
+    
+    try {
+      await runQuery(updateQuery, params);
+    } catch (error) {
+      console.error('Error updating ticket:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update ticket',
+        error: error.message
+      });
+    }
 
     // Get updated ticket with all user info including requester and assignee details
     const updatedTicket = await getQuery(
@@ -525,11 +540,9 @@ const updateTicket = async (req, res) => {
              u.id as user_id,
              u.name as user_name,
              u.email as user_email,
-             u.email_notifications as user_notifications,
              a.id as assigned_to_id,
              a.name as assigned_to_name,
-             a.email as assigned_to_email,
-             a.email_notifications as agent_notifications
+             a.email as assigned_to_email
       FROM tickets t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN users a ON t.assigned_to = a.id
@@ -549,9 +562,11 @@ const updateTicket = async (req, res) => {
       const ticketOwner = {
         id: updatedTicket.user_id,
         name: updatedTicket.user_name,
-        email: updatedTicket.user_email,
-        email_notifications: updatedTicket.user_notifications
+        email: updatedTicket.user_email
       };
+      
+      // Default to true for email notifications since we don't have the setting in the DB
+      const sendEmail = true;
 
       const changes = [];
       if (status && status !== ticket.status) changes.push(`Status changed to ${status}`);
@@ -569,8 +584,7 @@ const updateTicket = async (req, res) => {
               { 
                 id: updatedTicket.assigned_to_id,
                 email: updatedTicket.assigned_to_email,
-                name: updatedTicket.assigned_to_name,
-                email_notifications: updatedTicket.agent_notifications
+                name: updatedTicket.assigned_to_name
               },
               { 
                 id: userId, 
