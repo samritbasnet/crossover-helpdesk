@@ -3,9 +3,11 @@ import axios from "axios";
 
 // API configuration - determines base URL based on environment
 const getApiConfig = () => {
-  // Always use relative URL to ensure consistency
-  // Netlify will proxy /api/* to the backend
-  const baseURL = '/api';
+  // In production, use the full backend URL
+  // In development, use the local server
+  const baseURL = process.env.NODE_ENV === 'production'
+    ? 'https://crossover-helpdesk.onrender.com/api'
+    : 'http://localhost:3000/api';
   
   console.log(`API Configuration - Base URL: ${baseURL}`);
   
