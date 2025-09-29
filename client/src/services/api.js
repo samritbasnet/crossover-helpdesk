@@ -3,17 +3,11 @@ import axios from "axios";
 
 // API configuration - determines base URL based on environment
 const getApiConfig = () => {
-  // In production, use relative URLs to leverage the Netlify proxy
-  // In development, use the full URL with the correct port
-  const isProduction = process.env.NODE_ENV === 'production';
+  // Always use relative URL to ensure consistency
+  // Netlify will proxy /api/* to the backend
+  const baseURL = '/api';
   
-  // For production, use relative URL to leverage Netlify proxy
-  // For development, use the full backend URL
-  const baseURL = isProduction 
-    ? '/api'  // This will be proxied to the backend by Netlify
-    : 'http://localhost:3000/api';
-  
-  console.log(`API Configuration - Environment: ${process.env.NODE_ENV}, Base URL: ${baseURL}`);
+  console.log(`API Configuration - Base URL: ${baseURL}`);
   
   return {
     baseURL,
@@ -43,13 +37,14 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Log requests in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('API Request:', {
-        method: config.method?.toUpperCase(),
-        url: config.url,
-      });
-    }
+    // Always log request details for debugging
+    console.log('API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: config.baseURL + config.url,
+      headers: config.headers
+    });
 
     return config;
   },
