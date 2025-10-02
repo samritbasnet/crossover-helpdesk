@@ -1,50 +1,10 @@
-// routes/users.js - User management routes
+// User management routes
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const { getDatabase } = require("../config/database");
+const { runQuery, getQuery, getAllQuery } = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 
 const router = express.Router();
-
-// Helper functions for database operations
-const runQuery = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    const db = getDatabase();
-    db.run(query, params, function (err) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve({ id: this.lastID, changes: this.changes });
-      }
-    });
-  });
-};
-
-const getQuery = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    const db = getDatabase();
-    db.get(query, params, (err, row) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(row);
-      }
-    });
-  });
-};
-
-const getAllQuery = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    const db = getDatabase();
-    db.all(query, params, (err, rows) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(rows);
-      }
-    });
-  });
-};
 
 // Update email notification preferences
 router.put("/preferences", authenticateToken, async (req, res) => {
@@ -53,19 +13,20 @@ router.put("/preferences", authenticateToken, async (req, res) => {
     const { email_notifications } = req.body;
 
     // Validate email notification preference
-    const validPreferences = ['all', 'important', 'none'];
+    const validPreferences = ["all", "important", "none"];
     if (!validPreferences.includes(email_notifications)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid email notification preference. Must be one of: all, important, none"
+        message:
+          "Invalid email notification preference. Must be one of: all, important, none",
       });
     }
 
     // Update user preferences
-    await runQuery(
-      "UPDATE users SET email_notifications = ? WHERE id = ?",
-      [email_notifications, userId]
-    );
+    await runQuery("UPDATE users SET email_notifications = ? WHERE id = ?", [
+      email_notifications,
+      userId,
+    ]);
 
     // Get updated user info
     const user = await getQuery(
@@ -76,13 +37,13 @@ router.put("/preferences", authenticateToken, async (req, res) => {
     res.json({
       success: true,
       message: "Email preferences updated successfully",
-      user
+      user,
     });
   } catch (error) {
     console.error("Update preferences error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update preferences. Please try again."
+      message: "Failed to update preferences. Please try again.",
     });
   }
 });
@@ -90,6 +51,7 @@ router.put("/preferences", authenticateToken, async (req, res) => {
 // Get user profile
 router.get("/profile", authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId;
     const user = await getQuery(
       "SELECT id, name, email, role, created_at, updated_at FROM users WHERE id = ?",
       [userId]

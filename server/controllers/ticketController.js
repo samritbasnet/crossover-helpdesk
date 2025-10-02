@@ -1,56 +1,32 @@
-// controllers/ticketController.js - Ticket business logic
+// Ticket Controller - Simplified business logic
 const {
-  runQuery: dbRunQuery,
-  getQuery: dbGetQuery,
-  getAllQuery: dbGetAllQuery,
+  runQuery,
+  getQuery,
+  getAllQuery,
   getDatabase,
 } = require("../config/database");
-const { 
-  sendTicketCreatedNotification, 
-  sendTicketResolvedNotification 
+const {
+  sendTicketCreatedNotification,
+  sendTicketResolvedNotification,
 } = require("../services/emailService");
 
-// Helper functions for database operations
-const runQuery = async (query, params = []) => {
-  try {
-    const result = await dbRunQuery(query, params);
-    return {
-      id: result.insertId,
-      changes: result.affectedRows,
-    };
-  } catch (error) {
-    console.error("Error in runQuery:", error);
-    throw error;
-  }
-};
+// Constants for validation
+const VALID_PRIORITIES = ["low", "medium", "high", "urgent"];
+const VALID_STATUSES = ["open", "in-progress", "resolved", "closed"];
+const MIN_TITLE_LENGTH = 3;
+const MIN_DESCRIPTION_LENGTH = 10;
 
-const getQuery = async (query, params = []) => {
-  try {
-    const row = await dbGetQuery(query, params);
-    return row || null;
-  } catch (error) {
-    console.error("Error in getQuery:", error);
-    throw error;
-  }
-};
-
-const getAllQuery = async (query, params = []) => {
-  try {
-    const rows = await dbGetAllQuery(query, params);
-    return rows || [];
-  } catch (error) {
-    console.error("Error in getAllQuery:", error);
-    throw error;
-  }
-};
-
-// Create a new ticket
+/**
+ * Create a new ticket
+ * @param {Object} req - Request object with title, description, priority
+ * @param {Object} res - Response object
+ */
 const createTicket = async (req, res) => {
   try {
     const { title, description, priority = "medium" } = req.body;
     const userId = req.user.userId;
 
-    // Validation
+    // Input validation
     if (!title || !description) {
       return res.status(400).json({
         success: false,
@@ -58,76 +34,52 @@ const createTicket = async (req, res) => {
       });
     }
 
-    if (title.trim().length < 3) {
+    if (title.trim().length < MIN_TITLE_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: "Title must be at least 3 characters long",
+        message: `Title must be at least ${MIN_TITLE_LENGTH} characters long`,
       });
     }
 
-    if (description.trim().length < 10) {
+    if (description.trim().length < MIN_DESCRIPTION_LENGTH) {
       return res.status(400).json({
         success: false,
-        message: "Description must be at least 10 characters long",
+        message: `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters long`,
       });
     }
 
-    // Validate priority
-    const validPriorities = ["low", "medium", "high", "urgent"];
-    if (!validPriorities.includes(priority)) {
+    if (!VALID_PRIORITIES.includes(priority)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid priority. Must be one of: low, medium, high, urgent",
+        message: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(
+          ", "
+        )}`,
       });
     }
 
-    // Create ticket using direct database query
-    const db = getDatabase();
-    const result = await new Promise((resolve, reject) => {
-      db.run(
-        "INSERT INTO tickets (title, description, priority, user_id) VALUES (?, ?, ?, ?)",
-        [title.trim(), description.trim(), priority, userId],
-        function (err) {
-          if (err) {
-            console.error("Database error:", err);
-            reject(err);
-          } else {
-            resolve({ id: this.lastID });
-          }
-        }
-      );
-    });
+    // Create ticket
+    const result = await runQuery(
+      "INSERT INTO tickets (title, description, priority, user_id) VALUES (?, ?, ?, ?)",
+      [title.trim(), description.trim(), priority, userId]
+    );
 
-    // Get the created ticket with user info including email preferences
-    const ticket = await new Promise((resolve, reject) => {
-      db.get(
-        `
-        SELECT t.*, u.name as user_name, u.email as user_email
+    // Get created ticket with user info
+    const ticket = await getQuery(
+      `SELECT t.*, u.name as user_name, u.email as user_email
         FROM tickets t
         JOIN users u ON t.user_id = u.id
-        WHERE t.id = ?
-        `,
-        [result.id],
-        (err, row) => {
-          if (err) {
-            console.error("Database error:", err);
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+       WHERE t.id = ?`,
+      [result.insertId]
+    );
 
-    // Send email notification to user
+    // Send email notification (don't fail if email fails)
     try {
       await sendTicketCreatedNotification(ticket, {
         name: ticket.user_name,
-        email: ticket.user_email
+        email: ticket.user_email,
       });
-      console.log(`📧 Ticket creation notification sent to ${ticket.user_email}`);
     } catch (emailError) {
-      console.error('📧 Failed to send ticket creation notification:', emailError.message);
+      console.error("Email notification failed:", emailError.message);
     }
 
     res.status(201).json({
@@ -144,29 +96,27 @@ const createTicket = async (req, res) => {
   }
 };
 
-// Get all tickets with filtering and pagination
+/**
+ * Get all tickets with filtering and pagination
+ * @param {Object} req - Request object with query parameters
+ * @param {Object} res - Response object
+ */
 const getTickets = async (req, res) => {
   try {
     const {
       status,
       priority,
       category,
+      assigned,
       page = 1,
       limit = 10,
       search = "",
-      sortBy = "created_at",
-      sortOrder = "DESC",
     } = req.query;
+    const { userId, role: userRole } = req.user;
 
-    const userId = req.user.userId;
-    const userRole = req.user.role;
-
-    // Build the main query
+    // Build base query
     let query = `
-      SELECT t.*,
-             u.name as user_name,
-             u.email as user_email,
-             a.name as assigned_to_name
+      SELECT t.*, u.name as user_name, u.email as user_email, a.name as assigned_to_name
       FROM tickets t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN users a ON t.assigned_to = a.id
@@ -178,98 +128,53 @@ const getTickets = async (req, res) => {
     // Role-based access control
     if (userRole === "user") {
       conditions.push("t.user_id = ?");
-      params.push(parseInt(userId));
-    } else if (userRole === "agent") {
-      // Agents can see all tickets
-      // No additional conditions needed
+      params.push(userId);
     }
 
     // Add filters
-    if (status) {
-      conditions.push("t.status = ?");
-      params.push(status);
+    if (status) conditions.push("t.status = ?"), params.push(status);
+    if (priority) conditions.push("t.priority = ?"), params.push(priority);
+    if (category && category !== "all")
+      conditions.push("t.category = ?"), params.push(category);
+    if (assigned !== undefined) {
+      if (assigned === "true" || assigned === true) {
+        if (userRole === "agent") {
+          // For agents, show only tickets assigned to them
+          conditions.push("t.assigned_to = ?");
+          params.push(userId);
+        } else {
+          // For admin, show all assigned tickets
+          conditions.push("t.assigned_to IS NOT NULL");
+        }
+      } else if (assigned === "false" || assigned === false) {
+        conditions.push("t.assigned_to IS NULL");
+      }
     }
-
-    if (priority) {
-      conditions.push("t.priority = ?");
-      params.push(priority);
-    }
-
-    if (category && category !== "all") {
-      conditions.push("t.category = ?");
-      params.push(category);
-    }
-
-    // Search functionality
     if (search) {
       conditions.push("(t.title LIKE ? OR t.description LIKE ?)");
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    // Apply WHERE conditions
+    // Apply conditions
     if (conditions.length > 0) {
       query += " WHERE " + conditions.join(" AND ");
     }
 
-    // Sorting
-    const validSortFields = [
-      "created_at",
-      "updated_at",
-      "title",
-      "status",
-      "priority",
-    ];
-    const validSortOrders = ["ASC", "DESC"];
+    // Add sorting and pagination
+    query += " ORDER BY t.created_at DESC";
+    const offset = (page - 1) * limit;
+    query += ` LIMIT ${limit} OFFSET ${offset}`;
 
-    const sortField = validSortFields.includes(sortBy) ? sortBy : "created_at";
-    const sortDirection = validSortOrders.includes(sortOrder.toUpperCase())
-      ? sortOrder.toUpperCase()
-      : "DESC";
+    // Execute queries
+    const tickets = await getAllQuery(query, params);
 
-    query += ` ORDER BY t.${sortField} ${sortDirection}`;
-
-    // Pagination
-    const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 10;
-    const offset = (pageNum - 1) * limitNum;
-
-    // Add pagination to the query
-    const paginatedQuery = `${query} LIMIT ${limitNum} OFFSET ${offset}`;
-
-    // Execute query without passing limit/offset as parameters
-    const tickets = await getAllQuery(paginatedQuery, params);
-
-    // Get total count for pagination
+    // Get total count
     let countQuery = "SELECT COUNT(*) as total FROM tickets t";
-    let countParams = [];
-
-    // Apply same filters as the main query
     if (conditions.length > 0) {
       countQuery += " WHERE " + conditions.join(" AND ");
-      countParams = [...params]; // Create a copy of the params array
     }
-
-    // Get the total count
-    const countResult = await getQuery(countQuery, countParams);
+    const countResult = await getQuery(countQuery, params.slice(0, -2)); // Remove pagination params
     const total = countResult?.total || 0;
-
-    // Get summary statistics (for dashboard)
-    let statsQuery = "SELECT status, COUNT(*) as count FROM tickets t";
-    let statsParams = [];
-    let statsConditions = [];
-
-    // Apply same filters as the main query
-    if (userRole === "user") {
-      statsConditions.push("t.user_id = ?");
-      statsParams.push(parseInt(userId));
-    }
-
-    if (statsConditions.length > 0) {
-      statsQuery += " WHERE " + statsConditions.join(" AND ");
-    }
-
-    statsQuery += " GROUP BY t.status";
-    const stats = await getAllQuery(statsQuery, statsParams);
 
     res.json({
       success: true,
@@ -278,36 +183,27 @@ const getTickets = async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        totalPages: Math.ceil(total / parseInt(limit)),
-        hasNext: parseInt(page) < Math.ceil(total / parseInt(limit)),
-        hasPrev: parseInt(page) > 1,
-      },
-      stats: stats.reduce((acc, stat) => {
-        acc[stat.status] = stat.count;
-        return acc;
-      }, {}),
-      filters: {
-        status,
-        priority,
-        category,
-        search,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
-    console.error("Get tickets error:", error);
+    console.error("Get tickets error:", error.message);
     res.status(500).json({
       success: false,
-      message: "Failed to retrieve tickets. Please try again.",
+      message: "Failed to retrieve tickets",
     });
   }
 };
 
-// Get a single ticket by ID
+/**
+ * Get a single ticket by ID
+ * @param {Object} req - Request object with ticket ID
+ * @param {Object} res - Response object
+ */
 const getTicket = async (req, res) => {
   try {
     const ticketId = req.params.id;
-    const userId = req.user.userId;
-    const userRole = req.user.role;
+    const { userId, role: userRole } = req.user;
 
     // Validate ticket ID
     if (!ticketId || isNaN(ticketId)) {
@@ -317,18 +213,14 @@ const getTicket = async (req, res) => {
       });
     }
 
+    // Get ticket with user info
     const ticket = await getQuery(
-      `
-      SELECT t.*,
-             u.name as user_name,
-             u.email as user_email,
-             a.name as assigned_to_name,
-             a.email as assigned_to_email
+      `SELECT t.*, u.name as user_name, u.email as user_email,
+              a.name as assigned_to_name, a.email as assigned_to_email
       FROM tickets t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN users a ON t.assigned_to = a.id
-      WHERE t.id = ?
-    `,
+       WHERE t.id = ?`,
       [ticketId]
     );
 
@@ -340,42 +232,40 @@ const getTicket = async (req, res) => {
     }
 
     // Check access permissions
-    if (
-      userRole !== "admin" &&
-      ticket.user_id !== parseInt(userId) &&
-      ticket.assigned_to !== parseInt(userId)
-    ) {
+    const canAccess =
+      userRole === "admin" ||
+      ticket.user_id === userId ||
+      ticket.assigned_to === userId;
+
+    if (!canAccess) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. You can only view your own tickets.",
+        message: "Access denied",
       });
     }
 
-    // TODO: Get comments for this ticket (when comments table is implemented)
-    const comments = [];
-
     res.json({
       success: true,
-      ticket: {
-        ...ticket,
-        comments,
-      },
+      ticket: { ...ticket, comments: [] }, // Comments feature not implemented yet
     });
   } catch (error) {
-    console.error("Get ticket error:", error);
+    console.error("Get ticket error:", error.message);
     res.status(500).json({
       success: false,
-      message: "Failed to retrieve ticket. Please try again.",
+      message: "Failed to retrieve ticket",
     });
   }
 };
 
-// Update a ticket
+/**
+ * Update a ticket
+ * @param {Object} req - Request object with ticket ID and update data
+ * @param {Object} res - Response object
+ */
 const updateTicket = async (req, res) => {
   try {
     const ticketId = req.params.id;
-    const userId = req.user.userId;
-    const userRole = req.user.role;
+    const { userId, role: userRole } = req.user;
     const {
       title,
       description,
@@ -398,7 +288,6 @@ const updateTicket = async (req, res) => {
     const ticket = await getQuery("SELECT * FROM tickets WHERE id = ?", [
       ticketId,
     ]);
-
     if (!ticket) {
       return res.status(404).json({
         success: false,
@@ -406,51 +295,41 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Check permissions - Allow agents and admins to edit any ticket
-    const userIdNum = parseInt(userId);
-    const ticketUserId = parseInt(ticket.user_id);
-    const assignedToId = ticket.assigned_to
-      ? parseInt(ticket.assigned_to)
-      : null;
-
+    // Check permissions
     const canEdit =
       userRole === "admin" ||
       userRole === "agent" ||
-      ticketUserId === userIdNum ||
-      (assignedToId && assignedToId === userIdNum);
+      ticket.user_id === userId ||
+      ticket.assigned_to === userId;
 
     if (!canEdit) {
-      console.log(
-        `Permission denied for user ${userId} (${userRole}) trying to edit ticket ${ticketId} owned by ${ticket.user_id}`
-      );
       return res.status(403).json({
         success: false,
-        message:
-          "Access denied. You don't have permission to edit this ticket.",
+        message: "Access denied",
       });
     }
 
-    // Build update query dynamically
+    // Build update fields
     let updateFields = [];
     let params = [];
 
-    // Regular users can update these fields
-    if (title !== undefined && title.trim().length >= 3) {
+    // Basic fields any authorized user can update
+    if (title !== undefined && title.trim().length >= MIN_TITLE_LENGTH) {
       updateFields.push("title = ?");
       params.push(title.trim());
     }
 
-    if (description !== undefined && description.trim().length >= 10) {
+    if (
+      description !== undefined &&
+      description.trim().length >= MIN_DESCRIPTION_LENGTH
+    ) {
       updateFields.push("description = ?");
       params.push(description.trim());
     }
 
-    if (priority !== undefined) {
-      const validPriorities = ["low", "medium", "high", "urgent"];
-      if (validPriorities.includes(priority)) {
-        updateFields.push("priority = ?");
-        params.push(priority);
-      }
+    if (priority !== undefined && VALID_PRIORITIES.includes(priority)) {
+      updateFields.push("priority = ?");
+      params.push(priority);
     }
 
     if (category !== undefined) {
@@ -458,40 +337,26 @@ const updateTicket = async (req, res) => {
       params.push(category.trim());
     }
 
-    // Only admins and assigned agents can change status and assignment
-    if (
-      userRole === "admin" ||
-      userRole === "agent" ||
-      ticket.assigned_to === userIdNum
-    ) {
-      if (status !== undefined) {
-        const validStatuses = ["open", "in-progress", "resolved", "closed"];
-        if (validStatuses.includes(status)) {
-          // If resolving a ticket, require resolution notes
-          if (status === "resolved" && !resolution_notes) {
-            return res.status(400).json({
-              success: false,
-              message: "Resolution notes are required when resolving a ticket",
-            });
-          }
+    // Status and assignment (admin/agent only)
+    if (userRole === "admin" || userRole === "agent") {
+      if (status !== undefined && VALID_STATUSES.includes(status)) {
+        if (status === "resolved" && !resolution_notes) {
+          return res.status(400).json({
+            success: false,
+            message: "Resolution notes are required when resolving a ticket",
+          });
+        }
+        updateFields.push("status = ?");
+        params.push(status);
 
-          updateFields.push("status = ?");
-          params.push(status);
-
-          // If resolving, update resolved_at timestamp
-          if (status === "resolved") {
-            updateFields.push("resolved_at = CURRENT_TIMESTAMP");
-            updateFields.push("resolution_notes = ?");
-            params.push(resolution_notes);
-          }
+        if (status === "resolved") {
+          updateFields.push("resolved_at = CURRENT_TIMESTAMP");
+          updateFields.push("resolution_notes = ?");
+          params.push(resolution_notes);
         }
       }
 
-      // Only admins can reassign tickets
-      if (
-        assigned_to !== undefined &&
-        (userRole === "admin" || userRole === "agent")
-      ) {
+      if (assigned_to !== undefined) {
         updateFields.push("assigned_to = ?");
         params.push(assigned_to || null);
       }
@@ -504,72 +369,36 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Always update the timestamp
+    // Add timestamp and execute update
     updateFields.push("updated_at = CURRENT_TIMESTAMP");
     params.push(ticketId);
 
-    const updateQuery = `UPDATE tickets SET ${updateFields.join(
-      ", "
-    )} WHERE id = ?`;
+    await runQuery(
+      `UPDATE tickets SET ${updateFields.join(", ")} WHERE id = ?`,
+      params
+    );
 
-    try {
-      await runQuery(updateQuery, params);
-    } catch (error) {
-      console.error("Error updating ticket:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to update ticket",
-        error: error.message,
-      });
-    }
-
-    // Get updated ticket with all user info including requester and assignee details
+    // Get updated ticket
     const updatedTicket = await getQuery(
-      `
-      SELECT t.*,
-             u.id as user_id,
-             u.name as user_name,
-             u.email as user_email,
-             a.id as assigned_to_id,
-             a.name as assigned_to_name,
-             a.email as assigned_to_email
+      `SELECT t.*, u.name as user_name, u.email as user_email, a.name as assigned_to_name
       FROM tickets t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN users a ON t.assigned_to = a.id
-      WHERE t.id = ?
-    `,
+       WHERE t.id = ?`,
       [ticketId]
     );
 
-    // Get the user who made the update
-    const updatedBy = await getQuery(
-      "SELECT id, name, email, role FROM users WHERE id = ?",
-      [userId]
-    );
-
-    // Send email notifications
-    try {
-      const ticketOwner = {
-        id: updatedTicket.user_id,
-        name: updatedTicket.user_name,
-        email: updatedTicket.user_email
-      };
-      
-      const resolvedBy = {
-        id: userId,
-        name: req.user.name || 'Support Agent',
-        email: req.user.email
-      };
-
-      // Send resolution notification if ticket was resolved
-      if (status === 'resolved') {
-        await sendTicketResolvedNotification(updatedTicket, ticketOwner, resolvedBy);
-        console.log(`📧 Ticket resolution notification sent to ${ticketOwner.email}`);
-      } else {
-        console.log(`📧 Ticket updated by user: ${req.user.email}`);
+    // Send email notification if resolved
+    if (status === "resolved") {
+      try {
+        await sendTicketResolvedNotification(
+          updatedTicket,
+          { name: updatedTicket.user_name, email: updatedTicket.user_email },
+          { name: req.user.name || "Support Agent", email: req.user.email }
+        );
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError.message);
       }
-    } catch (emailError) {
-      console.error('📧 Failed to send email notification:', emailError.message);
     }
 
     res.json({
@@ -578,26 +407,23 @@ const updateTicket = async (req, res) => {
       ticket: updatedTicket,
     });
   } catch (error) {
-    console.error("Update ticket error:", error);
-    console.error("Error details:", {
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      sqlMessage: error.sqlMessage,
-    });
+    console.error("Update ticket error:", error.message);
     res.status(500).json({
       success: false,
-      message: `Failed to update ticket: ${error.message}`,
+      message: "Failed to update ticket",
     });
   }
 };
 
-// Delete a ticket
+/**
+ * Delete a ticket
+ * @param {Object} req - Request object with ticket ID
+ * @param {Object} res - Response object
+ */
 const deleteTicket = async (req, res) => {
   try {
     const ticketId = req.params.id;
-    const userId = req.user.userId;
-    const userRole = req.user.role;
+    const { userId, role: userRole } = req.user;
 
     // Validate ticket ID
     if (!ticketId || isNaN(ticketId)) {
@@ -611,6 +437,59 @@ const deleteTicket = async (req, res) => {
     const ticket = await getQuery("SELECT * FROM tickets WHERE id = ?", [
       ticketId,
     ]);
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    // Check permissions (admin or ticket owner only)
+    if (userRole !== "admin" && ticket.user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    // Delete the ticket
+    await runQuery("DELETE FROM tickets WHERE id = ?", [ticketId]);
+
+    res.json({
+      success: true,
+      message: "Ticket deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete ticket error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete ticket",
+    });
+  }
+};
+
+/**
+ * Agent assigns ticket to themselves
+ * @param {Object} req - Request object with ticket ID
+ * @param {Object} res - Response object
+ */
+const takeTicket = async (req, res) => {
+  try {
+    const { id: ticketId } = req.params;
+    const { userId, role: userRole } = req.user;
+
+    // Only agents can take tickets
+    if (userRole !== "agent") {
+      return res.status(403).json({
+        success: false,
+        message: "Only agents can take tickets",
+      });
+    }
+
+    // Get ticket details
+    const ticket = await getQuery("SELECT * FROM tickets WHERE id = ?", [
+      ticketId,
+    ]);
 
     if (!ticket) {
       return res.status(404).json({
@@ -619,30 +498,224 @@ const deleteTicket = async (req, res) => {
       });
     }
 
-    // Check permissions - only admin or ticket owner can delete
-    if (userRole !== "admin" && ticket.user_id !== parseInt(userId)) {
-      return res.status(403).json({
+    // Check if ticket is already assigned
+    if (ticket.assigned_to) {
+      return res.status(400).json({
         success: false,
-        message:
-          "Access denied. Only administrators or ticket owners can delete tickets.",
+        message: "Ticket is already assigned to another agent",
       });
     }
 
-    // TODO: Delete associated comments first (when comments table is implemented)
-    // await runQuery("DELETE FROM ticket_comments WHERE ticket_id = ?", [ticketId]);
-
-    // Delete the ticket
-    await runQuery("DELETE FROM tickets WHERE id = ?", [ticketId]);
+    // Assign ticket to current agent
+    await runQuery(
+      "UPDATE tickets SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [userId, ticketId]
+    );
 
     res.json({
       success: true,
-      message: "Ticket and associated comments deleted successfully",
+      message: "Ticket assigned to you successfully",
     });
   } catch (error) {
-    console.error("Delete ticket error:", error);
+    console.error("Take ticket error:", error.message);
     res.status(500).json({
       success: false,
-      message: "Failed to delete ticket. Please try again.",
+      message: "Failed to assign ticket",
+    });
+  }
+};
+
+/**
+ * Assign ticket to an agent (admin only)
+ * @param {Object} req - Request object with ticket ID and agent ID
+ * @param {Object} res - Response object
+ */
+const assignTicket = async (req, res) => {
+  try {
+    const { id: ticketId } = req.params;
+    const { assignedTo } = req.body;
+    const { userId, role: userRole } = req.user;
+
+    // Only admin can assign tickets
+    if (userRole !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only administrators can assign tickets",
+      });
+    }
+
+    // Get ticket details
+    const ticket = await getQuery("SELECT * FROM tickets WHERE id = ?", [
+      ticketId,
+    ]);
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    // Verify agent exists and is actually an agent
+    if (assignedTo) {
+      const agent = await getQuery(
+        "SELECT * FROM users WHERE id = ? AND role = 'agent'",
+        [assignedTo]
+      );
+
+      if (!agent) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid agent ID",
+        });
+      }
+    }
+
+    // Update ticket assignment
+    await runQuery(
+      "UPDATE tickets SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [assignedTo || null, ticketId]
+    );
+
+    res.json({
+      success: true,
+      message: assignedTo
+        ? "Ticket assigned successfully"
+        : "Ticket unassigned successfully",
+    });
+  } catch (error) {
+    console.error("Assign ticket error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign ticket",
+    });
+  }
+};
+
+/**
+ * Get all agents for ticket assignment
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+const getAgents = async (req, res) => {
+  try {
+    const { role: userRole } = req.user;
+
+    // Only admin can get agent list
+    if (userRole !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    const agents = await getAllQuery(
+      "SELECT id, name, email FROM users WHERE role = 'agent' ORDER BY name"
+    );
+
+    res.json({
+      success: true,
+      agents,
+    });
+  } catch (error) {
+    console.error("Get agents error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve agents",
+    });
+  }
+};
+
+/**
+ * Get dashboard statistics
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+const getDashboardStats = async (req, res) => {
+  try {
+    const { userId, role: userRole } = req.user;
+
+    let stats = {};
+
+    if (userRole === "admin") {
+      // Admin sees all stats
+      const totalTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets"
+      );
+      const openTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE status = 'open'"
+      );
+      const inProgressTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE status = 'in-progress'"
+      );
+      const resolvedTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE status = 'resolved'"
+      );
+      const totalUsers = await getQuery(
+        "SELECT COUNT(*) as count FROM users WHERE role = 'user'"
+      );
+      const totalAgents = await getQuery(
+        "SELECT COUNT(*) as count FROM users WHERE role = 'agent'"
+      );
+
+      stats = {
+        totalTickets: totalTickets.count,
+        openTickets: openTickets.count,
+        inProgressTickets: inProgressTickets.count,
+        resolvedTickets: resolvedTickets.count,
+        totalUsers: totalUsers.count,
+        totalAgents: totalAgents.count,
+      };
+    } else if (userRole === "agent") {
+      // Agent sees tickets assigned to them or unassigned
+      const myTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE assigned_to = ?",
+        [userId]
+      );
+      const unassignedTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE assigned_to IS NULL"
+      );
+      const myResolvedTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE assigned_to = ? AND status = 'resolved'",
+        [userId]
+      );
+
+      stats = {
+        myTickets: myTickets.count,
+        unassignedTickets: unassignedTickets.count,
+        myResolvedTickets: myResolvedTickets.count,
+      };
+    } else {
+      // User sees only their tickets
+      const myTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE user_id = ?",
+        [userId]
+      );
+      const myOpenTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE user_id = ? AND status = 'open'",
+        [userId]
+      );
+      const myResolvedTickets = await getQuery(
+        "SELECT COUNT(*) as count FROM tickets WHERE user_id = ? AND status = 'resolved'",
+        [userId]
+      );
+
+      stats = {
+        myTickets: myTickets.count,
+        myOpenTickets: myOpenTickets.count,
+        myResolvedTickets: myResolvedTickets.count,
+      };
+    }
+
+    res.json({
+      success: true,
+      stats,
+    });
+  } catch (error) {
+    console.error("Get dashboard stats error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve dashboard statistics",
     });
   }
 };
@@ -653,4 +726,8 @@ module.exports = {
   getTicket,
   updateTicket,
   deleteTicket,
+  assignTicket,
+  takeTicket,
+  getAgents,
+  getDashboardStats,
 };

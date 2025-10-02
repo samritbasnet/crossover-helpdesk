@@ -1,8 +1,16 @@
 // User Dashboard - Main page for regular users
-import { Add, Support } from "@mui/icons-material";
+import {
+  Add,
+  Assignment,
+  CheckCircle,
+  Support,
+  TrendingUp,
+} from "@mui/icons-material";
 import {
   Box,
   Button,
+  Card,
+  CardContent,
   Container,
   Grid,
   Typography,
@@ -12,7 +20,6 @@ import { useNavigate } from "react-router-dom";
 import EmptyState from "../components/common/EmptyState";
 import ErrorMessage from "../components/common/ErrorMessage";
 import Loading from "../components/common/Loading";
-import StatsCard from "../components/common/StatsCard";
 import TicketCard from "../components/common/TicketCard";
 import { useAuth } from "../context/AuthContext";
 import { ticketsAPI } from "../services/api";
@@ -22,51 +29,59 @@ const UserDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Load user's tickets
+  // Load user's tickets and stats
   useEffect(() => {
-    loadTickets();
+    loadDashboardData();
   }, []);
 
-  const loadTickets = async () => {
+  const loadDashboardData = async () => {
     try {
       setLoading(true);
       setError("");
-      
-      console.log('Fetching tickets...');
-      const response = await ticketsAPI.getTickets();
-      
-      // Debug log the entire response
-      console.log('Tickets API Response:', response);
-      
-      // The API returns { success, tickets, pagination, stats }
-      // But due to our axios interceptor, response is already the data object
-      if (response && response.success) {
-        if (Array.isArray(response.tickets)) {
-          console.log('Successfully loaded tickets:', response.tickets.length);
-          setTickets(response.tickets);
-          
-          // You can also store pagination and stats if needed
-          // setPagination(response.pagination);
-          // setStats(response.stats);
-        } else {
-          console.warn('Tickets array is missing or invalid in response:', response);
-          setTickets([]);
-        }
+
+      const [ticketsResponse, statsResponse] = await Promise.all([
+        ticketsAPI.getTickets(),
+        ticketsAPI.getDashboardStats(),
+      ]);
+
+      if (ticketsResponse.data && ticketsResponse.data.success) {
+        setTickets(ticketsResponse.data.tickets || []);
       } else {
-        console.warn('API request was not successful:', response);
-        setTickets([]);
+        setError("Failed to load tickets");
       }
-    } catch (err) {
-      console.error("Load tickets error:", err);
-      setError(getErrorMessage(err));
-      setTickets([]); // Reset tickets on error
+
+      if (statsResponse.data && statsResponse.data.success) {
+        setStats(statsResponse.data.stats || {});
+      }
+    } catch (error) {
+      setError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
   };
+
+  // Statistics cards for users
+  const StatCard = ({ title, value, icon, color = "primary" }) => (
+    <Card>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography color="textSecondary" gutterBottom variant="h6">
+              {title}
+            </Typography>
+            <Typography variant="h4" component="h2">
+              {value}
+            </Typography>
+          </Box>
+          <Box color={`${color}.main`}>{icon}</Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
 
   if (loading) {
     return (
@@ -103,37 +118,29 @@ const UserDashboard = () => {
         </Button>
       </Box>
 
-      {/* Stats Cards */}
+      {/* User Statistics */}
       <Grid container spacing={3} mb={4}>
-        <Grid xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={Support}
-            title="Total Tickets"
-            value={tickets.length}
+        <Grid item xs={12} sm={6} md={4}>
+          <StatCard
+            title="My Tickets"
+            value={stats.myTickets || 0}
+            icon={<Assignment fontSize="large" />}
             color="primary"
           />
         </Grid>
-        <Grid xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={Support}
+        <Grid item xs={12} sm={6} md={4}>
+          <StatCard
             title="Open Tickets"
-            value={tickets.filter((t) => t.status === "open").length}
+            value={stats.myOpenTickets || 0}
+            icon={<TrendingUp fontSize="large" />}
             color="warning"
           />
         </Grid>
-        <Grid xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={Support}
-            title="In Progress"
-            value={tickets.filter((t) => t.status === "in-progress").length}
-            color="info"
-          />
-        </Grid>
-        <Grid xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={Support}
+        <Grid item xs={12} sm={6} md={4}>
+          <StatCard
             title="Resolved"
-            value={tickets.filter((t) => t.status === "resolved").length}
+            value={stats.myResolvedTickets || 0}
+            icon={<CheckCircle fontSize="large" />}
             color="success"
           />
         </Grid>
@@ -157,20 +164,13 @@ const UserDashboard = () => {
       ) : (
         <Grid container spacing={2}>
           {tickets.slice(0, 6).map((ticket) => (
-            <Grid xs={12} md={6} key={ticket.id}>
+            <Grid item xs={12} md={6} key={ticket.id}>
               <TicketCard ticket={ticket} />
             </Grid>
           ))}
         </Grid>
       )}
 
-      {tickets.length > 6 && (
-        <Box textAlign="center" mt={3}>
-          <Button variant="outlined" onClick={() => navigate("/tickets")}>
-            View All Tickets
-          </Button>
-        </Box>
-      )}
     </Container>
   );
 };

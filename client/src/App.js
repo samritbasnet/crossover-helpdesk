@@ -17,7 +17,9 @@ import Navbar from "./components/Layout/Navbar";
 import CreateTicket from "./components/Tickets/CreateTicket";
 import EditTicket from "./components/Tickets/EditTicket";
 import TicketDetails from "./components/Tickets/TicketDetails";
+import TicketDetailsView from "./components/Tickets/TicketDetailsView";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import AdminDashboard from "./pages/AdminDashboard";
 import AgentDashboard from "./pages/AgentDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import NotFound from "./pages/NotFound";
@@ -28,6 +30,21 @@ import { USER_ROLES } from "./utils/constants";
 
 // Import the API test page
 import ApiTest from "./pages/ApiTest";
+
+// Role-based dashboard component
+const RoleBasedDashboard = () => {
+  const { user } = useAuth();
+
+  switch (user?.role) {
+    case USER_ROLES.ADMIN:
+      return <AdminDashboard />;
+    case USER_ROLES.AGENT:
+      return <AgentDashboard />;
+    case USER_ROLES.USER:
+    default:
+      return <UserDashboard />;
+  }
+};
 
 // Public routes configuration
 const publicRoutes = [
@@ -103,7 +120,7 @@ const AppRoutes = () => {
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <UserDashboard />
+                  <RoleBasedDashboard />
                 </ProtectedRoute>
               }
             />
@@ -132,10 +149,26 @@ const AppRoutes = () => {
               }
             />
             <Route
+              path="/admin-dashboard"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/agent-dashboard"
               element={
                 <ProtectedRoute>
                   <AgentDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ticket/:id"
+              element={
+                <ProtectedRoute>
+                  <TicketDetailsView />
                 </ProtectedRoute>
               }
             />

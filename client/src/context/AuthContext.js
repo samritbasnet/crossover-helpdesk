@@ -56,71 +56,32 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (credentials) => {
     try {
-      console.log('Attempting login with credentials:', {
-        email: credentials.email,
-        hasPassword: !!credentials.password
-      });
-      
-      // Clear any existing authentication state
+      // Clear existing auth state
       setUser(null);
       setToken(null);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
 
-      try {
-        // Call login API
-        console.log('Calling authAPI.login...');
-        const response = await authAPI.login(credentials);
-        console.log('Login API response received');
+      // Call login API
+      const response = await authAPI.login(credentials);
+      const { token: newToken, user: userData } = response.data;
 
-        // Handle different response formats
-        const responseData = response.data || response;
-        
-        if (!responseData) {
-          throw new Error('Empty response from server');
-        }
-
-        const { token: newToken, user: userData } = responseData;
-
-        // Validate response
-        if (!newToken || !userData) {
-          console.error('Invalid login response format:', responseData);
-          throw new Error("Invalid login response format");
-        }
-
-        // Store authentication data
-        localStorage.setItem("token", newToken);
-        localStorage.setItem("user", JSON.stringify(userData));
-        console.log('Authentication data stored in localStorage');
-
-        // Update state
-        setToken(newToken);
-        setUser(userData);
-        console.log('Auth state updated');
-
-        return { success: true, user: userData };
-      } catch (error) {
-        // Handle axios errors
-        if (error.response) {
-          // The request was made and the server responded with a status code
-          // that falls out of the range of 2xx
-          console.error('Login failed with status:', error.response.status);
-          console.error('Response data:', error.response.data);
-          throw new Error(error.response.data?.message || 'Login failed');
-        } else if (error.request) {
-          // The request was made but no response was received
-          console.error('No response received:', error.request);
-          throw new Error('No response from server. Please try again.');
-        } else {
-          // Something happened in setting up the request
-          console.error('Error setting up request:', error.message);
-          throw error;
-        }
+      // Validate response
+      if (!newToken || !userData) {
+        throw new Error("Invalid login response");
       }
-    } catch (error) {
-      console.error("Login failed:", error);
 
-      // Clear any partial state on error
+      // Store auth data
+      localStorage.setItem("token", newToken);
+      localStorage.setItem("user", JSON.stringify(userData));
+
+      // Update state
+      setToken(newToken);
+      setUser(userData);
+
+      return { success: true, user: userData };
+    } catch (error) {
+      // Clear state on error
       setUser(null);
       setToken(null);
       localStorage.removeItem("token");
@@ -128,7 +89,8 @@ export const AuthProvider = ({ children }) => {
 
       return {
         success: false,
-        message: error.response?.data?.message || error.message || "Login failed. Please try again.",
+        message:
+          error.response?.data?.message || error.message || "Login failed",
       };
     }
   };
@@ -137,16 +99,10 @@ export const AuthProvider = ({ children }) => {
   const signup = async (userData) => {
     try {
       const response = await authAPI.signup(userData);
-      
-      // The response data is in response.data
-      const responseData = response.data || response;
-      
-      // Extract token and user from response data
-      const { token: newToken, user: newUser } = responseData;
+      const { token: newToken, user: newUser } = response.data;
 
       if (!newToken || !newUser) {
-        console.error('Invalid signup response structure:', response);
-        throw new Error("Invalid signup response from server");
+        throw new Error("Invalid signup response");
       }
 
       // Store new user session
@@ -158,28 +114,21 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true };
     } catch (error) {
-      console.error("Signup failed:", error);
       return {
         success: false,
-        message: error.response?.data?.message || error.message || "Signup failed. Please try again.",
+        message:
+          error.response?.data?.message || error.message || "Signup failed",
       };
     }
   };
 
   // Logout function
   const logout = () => {
-    console.log("User logging out...");
-
-    // Clear stored data
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-
-    // Clear state
     setToken(null);
     setUser(null);
-
-    // Redirect to login page
-    window.location.href = "/login?session_expired=true";
+    window.location.href = "/login";
   };
 
   // Role checking functions
@@ -200,9 +149,5 @@ export const AuthProvider = ({ children }) => {
     isUser,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

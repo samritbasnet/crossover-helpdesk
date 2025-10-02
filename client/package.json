@@ -17,7 +17,7 @@
     "react-router-dom": "^7.9.1",
     "react-scripts": "5.0.1"
   },
-  "proxy": "http://localhost:3001",
+  "proxy": "http://localhost:3000",
   "scripts": {
     "start": "react-scripts start",
     "dev": "REACT_APP_API_URL=http://localhost:3000 react-scripts start",

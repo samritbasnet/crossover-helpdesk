@@ -1,11 +1,13 @@
-// Agent Dashboard - Ticket management for support agents
+// Admin Dashboard - Full system overview and management
 import {
   Assignment,
   AssignmentInd,
-  CheckCircle,
+  Delete,
   Edit,
+  Group,
   MoreVert,
-  Visibility,
+  Person,
+  TrendingUp,
 } from "@mui/icons-material";
 import {
   Box,
@@ -31,7 +33,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
@@ -45,23 +46,20 @@ import {
   getStatusColor,
 } from "../utils/helpers";
 
-const AgentDashboard = () => {
+const AdminDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   // State management
   const [stats, setStats] = useState({});
-  const [myTickets, setMyTickets] = useState([]);
-  const [unassignedTickets, setUnassignedTickets] = useState([]);
+  const [tickets, setTickets] = useState([]);
+  const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [updateData, setUpdateData] = useState({
-    status: "",
-    resolution_notes: "",
-  });
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState("");
 
   // Load dashboard data
   useEffect(() => {
@@ -71,16 +69,16 @@ const AgentDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [statsResponse, myTicketsResponse, unassignedResponse] =
+      const [statsResponse, ticketsResponse, agentsResponse] =
         await Promise.all([
           ticketsAPI.getDashboardStats(),
-          ticketsAPI.getTickets({ assigned: true }),
-          ticketsAPI.getTickets({ assigned: false }),
+          ticketsAPI.getTickets(),
+          ticketsAPI.getAgents(),
         ]);
 
       setStats(statsResponse.data.stats);
-      setMyTickets(myTicketsResponse.data.tickets || []);
-      setUnassignedTickets(unassignedResponse.data.tickets || []);
+      setTickets(ticketsResponse.data.tickets || []);
+      setAgents(agentsResponse.data.agents || []);
     } catch (err) {
       setError(err.message || "Failed to load dashboard data");
     } finally {
@@ -88,25 +86,27 @@ const AgentDashboard = () => {
     }
   };
 
-  const handleUpdateTicket = async () => {
+  const handleAssignTicket = async () => {
     try {
-      await ticketsAPI.updateTicket(selectedTicket.id, updateData);
-      setUpdateDialogOpen(false);
+      await ticketsAPI.assignTicket(selectedTicket.id, selectedAgent);
+      setAssignDialogOpen(false);
       setAnchorEl(null);
       setSelectedTicket(null);
-      setUpdateData({ status: "", resolution_notes: "" });
+      setSelectedAgent("");
       loadDashboardData(); // Refresh data
     } catch (err) {
-      setError(err.message || "Failed to update ticket");
+      setError(err.message || "Failed to assign ticket");
     }
   };
 
-  const handleTakeTicket = async (ticketId) => {
-    try {
-      await ticketsAPI.takeTicket(ticketId);
-      loadDashboardData(); // Refresh data
-    } catch (err) {
-      setError(err.message || "Failed to take ticket");
+  const handleDeleteTicket = async (ticketId) => {
+    if (window.confirm("Are you sure you want to delete this ticket?")) {
+      try {
+        await ticketsAPI.deleteTicket(ticketId);
+        loadDashboardData(); // Refresh data
+      } catch (err) {
+        setError(err.message || "Failed to delete ticket");
+      }
     }
   };
 
@@ -120,12 +120,9 @@ const AgentDashboard = () => {
     setSelectedTicket(null);
   };
 
-  const openUpdateDialog = () => {
-    setUpdateDialogOpen(true);
-    setUpdateData({
-      status: selectedTicket?.status || "",
-      resolution_notes: selectedTicket?.resolution_notes || "",
-    });
+  const openAssignDialog = () => {
+    setAssignDialogOpen(true);
+    setSelectedAgent(selectedTicket?.assigned_to || "");
     handleMenuClose();
   };
 
@@ -164,7 +161,7 @@ const AgentDashboard = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Agent Dashboard
+        Admin Dashboard
       </Typography>
       <Typography variant="subtitle1" color="textSecondary" gutterBottom>
         Welcome back, {user?.name}
@@ -174,28 +171,52 @@ const AgentDashboard = () => {
 
       {/* Statistics Overview */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={2}>
           <StatCard
-            title="My Tickets"
-            value={stats.myTickets || 0}
+            title="Total Tickets"
+            value={stats.totalTickets || 0}
             icon={<Assignment fontSize="large" />}
             color="primary"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={2}>
           <StatCard
-            title="Unassigned"
-            value={stats.unassignedTickets || 0}
-            icon={<AssignmentInd fontSize="large" />}
+            title="Open Tickets"
+            value={stats.openTickets || 0}
+            icon={<TrendingUp fontSize="large" />}
             color="warning"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={2}>
+          <StatCard
+            title="In Progress"
+            value={stats.inProgressTickets || 0}
+            icon={<AssignmentInd fontSize="large" />}
+            color="info"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2}>
           <StatCard
             title="Resolved"
-            value={stats.myResolvedTickets || 0}
-            icon={<CheckCircle fontSize="large" />}
+            value={stats.resolvedTickets || 0}
+            icon={<TrendingUp fontSize="large" />}
             color="success"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2}>
+          <StatCard
+            title="Total Users"
+            value={stats.totalUsers || 0}
+            icon={<Person fontSize="large" />}
+            color="secondary"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2}>
+          <StatCard
+            title="Agents"
+            value={stats.totalAgents || 0}
+            icon={<Group fontSize="large" />}
+            color="info"
           />
         </Grid>
       </Grid>
@@ -205,21 +226,32 @@ const AgentDashboard = () => {
         <Button
           variant="contained"
           color="primary"
-          onClick={() => navigate("/knowledge")}
+          onClick={() => navigate("/admin/users")}
           sx={{ mr: 2 }}
         >
+          Manage Users
+        </Button>
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={() => navigate("/admin/agents")}
+          sx={{ mr: 2 }}
+        >
+          Manage Agents
+        </Button>
+        <Button variant="outlined" onClick={() => navigate("/knowledge")}>
           Knowledge Base
         </Button>
-        <Button variant="outlined" onClick={() => navigate("/create-ticket")}>
+        <Button variant="contained" onClick={() => navigate("/create-ticket")}>
           Create Ticket
         </Button>
       </Box>
 
-      {/* My Assigned Tickets */}
-      <Card sx={{ mb: 3 }}>
+      {/* All Tickets Table */}
+      <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            My Assigned Tickets
+            All Tickets
           </Typography>
           <TableContainer component={Paper}>
             <Table>
@@ -230,12 +262,13 @@ const AgentDashboard = () => {
                   <TableCell>User</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Priority</TableCell>
+                  <TableCell>Assigned To</TableCell>
                   <TableCell>Created</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {myTickets.map((ticket) => (
+                {tickets.map((ticket) => (
                   <TableRow key={ticket.id}>
                     <TableCell>#{ticket.id}</TableCell>
                     <TableCell>
@@ -264,6 +297,9 @@ const AgentDashboard = () => {
                         size="small"
                       />
                     </TableCell>
+                    <TableCell>
+                      {ticket.assigned_to_name || "Unassigned"}
+                    </TableCell>
                     <TableCell>{formatDateTime(ticket.created_at)}</TableCell>
                     <TableCell>
                       <IconButton
@@ -281,111 +317,36 @@ const AgentDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Unassigned Tickets */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Unassigned Tickets
-          </Typography>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Title</TableCell>
-                  <TableCell>User</TableCell>
-                  <TableCell>Priority</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {unassignedTickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
-                    <TableCell>#{ticket.id}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="text"
-                        onClick={() => navigate(`/ticket/${ticket.id}`)}
-                        sx={{ textAlign: "left", p: 0, textTransform: "none" }}
-                      >
-                        <Typography variant="body2" noWrap>
-                          {ticket.title}
-                        </Typography>
-                      </Button>
-                    </TableCell>
-                    <TableCell>{ticket.user_name}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={ticket.priority}
-                        color={getPriorityColor(ticket.priority)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{formatDateTime(ticket.created_at)}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="primary"
-                        onClick={() => handleTakeTicket(ticket.id)}
-                      >
-                        Take Ticket
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
-
-      {/* Update Ticket Dialog */}
+      {/* Assignment Dialog */}
       <Dialog
-        open={updateDialogOpen}
-        onClose={() => setUpdateDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
+        open={assignDialogOpen}
+        onClose={() => setAssignDialogOpen(false)}
       >
-        <DialogTitle>Update Ticket</DialogTitle>
+        <DialogTitle>Assign Ticket</DialogTitle>
         <DialogContent>
           <Typography variant="body2" gutterBottom>
-            Update ticket #{selectedTicket?.id}: {selectedTicket?.title}
+            Assign ticket #{selectedTicket?.id}: {selectedTicket?.title}
           </Typography>
-
           <FormControl fullWidth sx={{ mt: 2 }}>
-            <InputLabel>Status</InputLabel>
+            <InputLabel>Select Agent</InputLabel>
             <Select
-              value={updateData.status}
-              onChange={(e) =>
-                setUpdateData({ ...updateData, status: e.target.value })
-              }
-              label="Status"
+              value={selectedAgent}
+              onChange={(e) => setSelectedAgent(e.target.value)}
+              label="Select Agent"
             >
-              <MenuItem value="open">Open</MenuItem>
-              <MenuItem value="in-progress">In Progress</MenuItem>
-              <MenuItem value="resolved">Resolved</MenuItem>
+              <MenuItem value="">Unassigned</MenuItem>
+              {agents.map((agent) => (
+                <MenuItem key={agent.id} value={agent.id}>
+                  {agent.name} ({agent.email})
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
-
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="Resolution Notes"
-            value={updateData.resolution_notes}
-            onChange={(e) =>
-              setUpdateData({ ...updateData, resolution_notes: e.target.value })
-            }
-            sx={{ mt: 2 }}
-            placeholder="Add notes about the resolution..."
-          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUpdateDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleUpdateTicket} variant="contained">
-            Update Ticket
+          <Button onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleAssignTicket} variant="contained">
+            Assign
           </Button>
         </DialogActions>
       </Dialog>
@@ -397,16 +358,23 @@ const AgentDashboard = () => {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={() => navigate(`/ticket/${selectedTicket?.id}`)}>
-          <Visibility sx={{ mr: 1 }} />
+          <Edit sx={{ mr: 1 }} />
           View Details
         </MenuItem>
-        <MenuItem onClick={openUpdateDialog}>
-          <Edit sx={{ mr: 1 }} />
-          Update Status
+        <MenuItem onClick={openAssignDialog}>
+          <AssignmentInd sx={{ mr: 1 }} />
+          Assign Ticket
+        </MenuItem>
+        <MenuItem
+          onClick={() => handleDeleteTicket(selectedTicket?.id)}
+          sx={{ color: "error.main" }}
+        >
+          <Delete sx={{ mr: 1 }} />
+          Delete Ticket
         </MenuItem>
       </Menu>
     </Box>
   );
 };
 
-export default AgentDashboard;
+export default AdminDashboard;

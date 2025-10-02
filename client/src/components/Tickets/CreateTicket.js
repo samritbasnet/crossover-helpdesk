@@ -15,11 +15,11 @@ import {
 } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ErrorMessage from "../common/ErrorMessage";
 import { useAuth } from "../../context/AuthContext";
 import { ticketsAPI } from "../../services/api";
-import { getErrorMessage } from "../../utils/helpers";
 import { TICKET_PRIORITY } from "../../utils/constants";
+import { getErrorMessage } from "../../utils/helpers";
+import ErrorMessage from "../common/ErrorMessage";
 
 const CreateTicket = () => {
   // State for form data
@@ -85,7 +85,7 @@ const CreateTicket = () => {
     try {
       const result = await ticketsAPI.createTicket(formData);
 
-      if (result.success) {
+      if (result.data.success) {
         setSuccess(true);
         // Reset form
         setFormData({
@@ -99,7 +99,7 @@ const CreateTicket = () => {
           navigate("/dashboard");
         }, 2000);
       } else {
-        setError(result.message || "Failed to create ticket");
+        setError(result.data.message || "Failed to create ticket");
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -145,8 +145,8 @@ const CreateTicket = () => {
           <ErrorMessage error={error} />
 
           {success && (
-            <ErrorMessage 
-              error="Ticket created successfully! Redirecting to dashboard..." 
+            <ErrorMessage
+              error="Ticket created successfully! Redirecting to dashboard..."
               severity="success"
               title="Success"
             />
