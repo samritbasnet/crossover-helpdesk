@@ -1,22 +1,25 @@
 // controllers/ticketController.js - Ticket business logic
-const { 
-  runQuery: dbRunQuery, 
-  getQuery: dbGetQuery, 
+const {
+  runQuery: dbRunQuery,
+  getQuery: dbGetQuery,
   getAllQuery: dbGetAllQuery,
-  execute: dbExecute
+  getDatabase,
 } = require("../config/database");
-const { notifyTicketResolved } = require("../services/emailService");
+const { 
+  sendTicketCreatedNotification, 
+  sendTicketResolvedNotification 
+} = require("../services/emailService");
 
 // Helper functions for database operations
 const runQuery = async (query, params = []) => {
   try {
     const result = await dbRunQuery(query, params);
-    return { 
-      id: result.insertId, 
-      changes: result.affectedRows 
+    return {
+      id: result.insertId,
+      changes: result.affectedRows,
     };
   } catch (error) {
-    console.error('Error in runQuery:', error);
+    console.error("Error in runQuery:", error);
     throw error;
   }
 };
@@ -26,7 +29,7 @@ const getQuery = async (query, params = []) => {
     const row = await dbGetQuery(query, params);
     return row || null;
   } catch (error) {
-    console.error('Error in getQuery:', error);
+    console.error("Error in getQuery:", error);
     throw error;
   }
 };
@@ -36,7 +39,7 @@ const getAllQuery = async (query, params = []) => {
     const rows = await dbGetAllQuery(query, params);
     return rows || [];
   } catch (error) {
-    console.error('Error in getAllQuery:', error);
+    console.error("Error in getAllQuery:", error);
     throw error;
   }
 };
@@ -44,11 +47,7 @@ const getAllQuery = async (query, params = []) => {
 // Create a new ticket
 const createTicket = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      priority = "medium"
-    } = req.body;
+    const { title, description, priority = "medium" } = req.body;
     const userId = req.user.userId;
 
     // Validation
@@ -88,9 +87,9 @@ const createTicket = async (req, res) => {
       db.run(
         "INSERT INTO tickets (title, description, priority, user_id) VALUES (?, ?, ?, ?)",
         [title.trim(), description.trim(), priority, userId],
-        function(err) {
+        function (err) {
           if (err) {
-            console.error('Database error:', err);
+            console.error("Database error:", err);
             reject(err);
           } else {
             resolve({ id: this.lastID });
@@ -111,7 +110,7 @@ const createTicket = async (req, res) => {
         [result.id],
         (err, row) => {
           if (err) {
-            console.error('Database error:', err);
+            console.error("Database error:", err);
             reject(err);
           } else {
             resolve(row);
@@ -122,15 +121,13 @@ const createTicket = async (req, res) => {
 
     // Send email notification to user
     try {
-      const user = {
+      await sendTicketCreatedNotification(ticket, {
         name: ticket.user_name,
-        email: ticket.user_email,
-      };
-      await notifyTicketCreated(ticket, user);
-      console.log(`📧 Ticket creation notification sent to ${user.email}`);
+        email: ticket.user_email
+      });
+      console.log(`📧 Ticket creation notification sent to ${ticket.user_email}`);
     } catch (emailError) {
       console.error('📧 Failed to send ticket creation notification:', emailError.message);
-      // Don't fail the request if email fails
     }
 
     res.status(201).json({
@@ -232,63 +229,46 @@ const getTickets = async (req, res) => {
     query += ` ORDER BY t.${sortField} ${sortDirection}`;
 
     // Pagination
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    query += ` LIMIT ? OFFSET ?`;
-    params.push(parseInt(limit), offset);
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 10;
+    const offset = (pageNum - 1) * limitNum;
 
-    const tickets = await getAllQuery(query, params);
+    // Add pagination to the query
+    const paginatedQuery = `${query} LIMIT ${limitNum} OFFSET ${offset}`;
+
+    // Execute query without passing limit/offset as parameters
+    const tickets = await getAllQuery(paginatedQuery, params);
 
     // Get total count for pagination
     let countQuery = "SELECT COUNT(*) as total FROM tickets t";
     let countParams = [];
-    let countConditions = [];
 
-    // Apply same filters for count
-    if (userRole === "user") {
-      countConditions.push("t.user_id = ?");
-      countParams.push(parseInt(userId));
-    } else if (userRole === "agent") {
-      // Agents can see all tickets
-      // No additional conditions needed
+    // Apply same filters as the main query
+    if (conditions.length > 0) {
+      countQuery += " WHERE " + conditions.join(" AND ");
+      countParams = [...params]; // Create a copy of the params array
     }
 
-    if (status) {
-      countConditions.push("t.status = ?");
-      countParams.push(status);
-    }
-
-    if (priority) {
-      countConditions.push("t.priority = ?");
-      countParams.push(priority);
-    }
-
-    if (category && category !== "all") {
-      countConditions.push("t.category = ?");
-      countParams.push(category);
-    }
-
-    if (search) {
-      countConditions.push("(t.title LIKE ? OR t.description LIKE ?)");
-      countParams.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (countConditions.length > 0) {
-      countQuery += " WHERE " + countConditions.join(" AND ");
-    }
-
-    const totalResult = await getQuery(countQuery, countParams);
-    const total = totalResult.total;
+    // Get the total count
+    const countResult = await getQuery(countQuery, countParams);
+    const total = countResult?.total || 0;
 
     // Get summary statistics (for dashboard)
-    let statsQuery = "SELECT status, COUNT(*) as count FROM tickets";
+    let statsQuery = "SELECT status, COUNT(*) as count FROM tickets t";
     let statsParams = [];
+    let statsConditions = [];
 
+    // Apply same filters as the main query
     if (userRole === "user") {
-      statsQuery += " WHERE user_id = ?";
+      statsConditions.push("t.user_id = ?");
       statsParams.push(parseInt(userId));
     }
 
-    statsQuery += " GROUP BY status";
+    if (statsConditions.length > 0) {
+      statsQuery += " WHERE " + statsConditions.join(" AND ");
+    }
+
+    statsQuery += " GROUP BY t.status";
     const stats = await getAllQuery(statsQuery, statsParams);
 
     res.json({
@@ -371,17 +351,8 @@ const getTicket = async (req, res) => {
       });
     }
 
-    // Get comments for this ticket
-    const comments = await getAllQuery(
-      `
-      SELECT c.*, u.name as user_name, u.role as user_role
-      FROM ticket_comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.ticket_id = ?
-      ORDER BY c.created_at ASC
-    `,
-      [ticketId]
-    );
+    // TODO: Get comments for this ticket (when comments table is implemented)
+    const comments = [];
 
     res.json({
       success: true,
@@ -405,8 +376,15 @@ const updateTicket = async (req, res) => {
     const ticketId = req.params.id;
     const userId = req.user.userId;
     const userRole = req.user.role;
-    const { title, description, status, priority, category, assigned_to, resolution_notes } =
-      req.body;
+    const {
+      title,
+      description,
+      status,
+      priority,
+      category,
+      assigned_to,
+      resolution_notes,
+    } = req.body;
 
     // Validate ticket ID
     if (!ticketId || isNaN(ticketId)) {
@@ -431,8 +409,10 @@ const updateTicket = async (req, res) => {
     // Check permissions - Allow agents and admins to edit any ticket
     const userIdNum = parseInt(userId);
     const ticketUserId = parseInt(ticket.user_id);
-    const assignedToId = ticket.assigned_to ? parseInt(ticket.assigned_to) : null;
-    
+    const assignedToId = ticket.assigned_to
+      ? parseInt(ticket.assigned_to)
+      : null;
+
     const canEdit =
       userRole === "admin" ||
       userRole === "agent" ||
@@ -440,10 +420,13 @@ const updateTicket = async (req, res) => {
       (assignedToId && assignedToId === userIdNum);
 
     if (!canEdit) {
-      console.log(`Permission denied for user ${userId} (${userRole}) trying to edit ticket ${ticketId} owned by ${ticket.user_id}`);
+      console.log(
+        `Permission denied for user ${userId} (${userRole}) trying to edit ticket ${ticketId} owned by ${ticket.user_id}`
+      );
       return res.status(403).json({
         success: false,
-        message: "Access denied. You don't have permission to edit this ticket.",
+        message:
+          "Access denied. You don't have permission to edit this ticket.",
       });
     }
 
@@ -476,24 +459,28 @@ const updateTicket = async (req, res) => {
     }
 
     // Only admins and assigned agents can change status and assignment
-    if (userRole === "admin" || userRole === "agent" || ticket.assigned_to === userIdNum) {
+    if (
+      userRole === "admin" ||
+      userRole === "agent" ||
+      ticket.assigned_to === userIdNum
+    ) {
       if (status !== undefined) {
         const validStatuses = ["open", "in-progress", "resolved", "closed"];
         if (validStatuses.includes(status)) {
           // If resolving a ticket, require resolution notes
-          if (status === 'resolved' && !resolution_notes) {
+          if (status === "resolved" && !resolution_notes) {
             return res.status(400).json({
               success: false,
               message: "Resolution notes are required when resolving a ticket",
             });
           }
-          
+
           updateFields.push("status = ?");
           params.push(status);
-          
+
           // If resolving, update resolved_at timestamp
-          if (status === 'resolved') {
-            updateFields.push("resolved_at = NOW()");
+          if (status === "resolved") {
+            updateFields.push("resolved_at = CURRENT_TIMESTAMP");
             updateFields.push("resolution_notes = ?");
             params.push(resolution_notes);
           }
@@ -501,7 +488,10 @@ const updateTicket = async (req, res) => {
       }
 
       // Only admins can reassign tickets
-      if (assigned_to !== undefined && (userRole === "admin" || userRole === "agent")) {
+      if (
+        assigned_to !== undefined &&
+        (userRole === "admin" || userRole === "agent")
+      ) {
         updateFields.push("assigned_to = ?");
         params.push(assigned_to || null);
       }
@@ -515,21 +505,21 @@ const updateTicket = async (req, res) => {
     }
 
     // Always update the timestamp
-    updateFields.push("updated_at = NOW()");
+    updateFields.push("updated_at = CURRENT_TIMESTAMP");
     params.push(ticketId);
 
     const updateQuery = `UPDATE tickets SET ${updateFields.join(
       ", "
     )} WHERE id = ?`;
-    
+
     try {
       await runQuery(updateQuery, params);
     } catch (error) {
-      console.error('Error updating ticket:', error);
+      console.error("Error updating ticket:", error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to update ticket',
-        error: error.message
+        message: "Failed to update ticket",
+        error: error.message,
       });
     }
 
@@ -565,84 +555,21 @@ const updateTicket = async (req, res) => {
         email: updatedTicket.user_email
       };
       
-      // Default to true for email notifications since we don't have the setting in the DB
-      const sendEmail = true;
+      const resolvedBy = {
+        id: userId,
+        name: req.user.name || 'Support Agent',
+        email: req.user.email
+      };
 
-      const changes = [];
-      if (status && status !== ticket.status) changes.push(`Status changed to ${status}`);
-      if (priority && priority !== ticket.priority) changes.push(`Priority changed to ${priority}`);
-      
-      // Handle assignment changes
-      if (assigned_to !== undefined && assigned_to !== ticket.assigned_to) {
-        if (assigned_to) {
-          changes.push(`Assigned to ${updatedTicket.assigned_to_name}`);
-          
-          // Notify the newly assigned agent
-          if (updatedTicket.assigned_to_id) {
-            await notifyAgentAssigned(
-              updatedTicket,
-              { 
-                id: updatedTicket.assigned_to_id,
-                email: updatedTicket.assigned_to_email,
-                name: updatedTicket.assigned_to_name
-              },
-              { 
-                id: userId, 
-                name: req.user.name, 
-                email: req.user.email 
-              }
-            );
-          }
-        } else {
-          changes.push('Ticket unassigned');
-        }
-      }
-
-      // Handle resolution notification
+      // Send resolution notification if ticket was resolved
       if (status === 'resolved') {
-        console.log('Preparing to send resolution notification...', {
-          ticketId: updatedTicket.id,
-          recipient: ticketOwner.email,
-          hasResolutionNotes: !!resolution_notes
-        });
-        
-        try {
-          await notifyTicketResolved(
-            updatedTicket,
-            ticketOwner,
-            { 
-              id: userId,
-              name: req.user.name,
-              email: req.user.email
-            },
-            resolution_notes
-          );
-          console.log(`✅ Resolution notification sent to ${ticketOwner.email}`);
-        } catch (emailError) {
-          console.error('❌ Failed to send resolution notification:', emailError);
-          // Don't fail the request if email fails
-          console.log('Continuing with ticket update despite email error');
-        }
+        await sendTicketResolvedNotification(updatedTicket, ticketOwner, resolvedBy);
+        console.log(`📧 Ticket resolution notification sent to ${ticketOwner.email}`);
+      } else {
+        console.log(`📧 Ticket updated by user: ${req.user.email}`);
       }
-      // Send general update notification if there were changes (but not for resolved tickets as they get special treatment)
-      else if (changes.length > 0) {
-        await notifyTicketUpdated(
-          updatedTicket,
-          ticketOwner,
-          { 
-            id: userId,
-            name: req.user.name,
-            email: req.user.email,
-            role: userRole
-          },
-          changes
-        );
-        console.log(`📧 Ticket update notification sent to ${ticketOwner.email}`);
-      }
-
     } catch (emailError) {
-      console.error('📧 Failed to send ticket update notification:', emailError.message);
-      // Don't fail the request if email fails
+      console.error('📧 Failed to send email notification:', emailError.message);
     }
 
     res.json({
@@ -656,7 +583,7 @@ const updateTicket = async (req, res) => {
       message: error.message,
       stack: error.stack,
       code: error.code,
-      sqlMessage: error.sqlMessage
+      sqlMessage: error.sqlMessage,
     });
     res.status(500).json({
       success: false,
@@ -701,10 +628,8 @@ const deleteTicket = async (req, res) => {
       });
     }
 
-    // Delete associated comments first (foreign key constraint)
-    await runQuery("DELETE FROM ticket_comments WHERE ticket_id = ?", [
-      ticketId,
-    ]);
+    // TODO: Delete associated comments first (when comments table is implemented)
+    // await runQuery("DELETE FROM ticket_comments WHERE ticket_id = ?", [ticketId]);
 
     // Delete the ticket
     await runQuery("DELETE FROM tickets WHERE id = ?", [ticketId]);

@@ -62,21 +62,31 @@ const Login = () => {
     }
 
     try {
+      console.log('Submitting login form...');
       const result = await login(formData);
+      console.log('Login result:', result);
 
       if (result.success) {
+        console.log('Login successful, redirecting...');
+        // Use the user data from the login result
+        const user = result.user || JSON.parse(localStorage.getItem("user") || '{}');
+        console.log('User role:', user.role);
+        
         // Redirect based on user role
-        const user = JSON.parse(localStorage.getItem("user"));
-        if (user?.role === "agent") {
+        if (user.role === "agent" || user.role === "admin") {
+          console.log('Redirecting to agent dashboard');
           navigate("/agent-dashboard");
         } else {
+          console.log('Redirecting to user dashboard');
           navigate("/dashboard");
         }
       } else {
+        console.error('Login failed:', result.message);
         setError(result.message || "Invalid credentials, please try again.");
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again later.");
+      console.error('Login error:', err);
+      setError(err.message || "An unexpected error occurred. Please try again later.");
     } finally {
       setLoading(false);
     }

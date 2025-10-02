@@ -1,205 +1,241 @@
-📌# 🎫 Crossover Helpdesk System
+# Crossover Helpdesk System
 
-A modern, full-stack helpdesk and ticketing system built with React and Node.js. Features user authentication, ticket management, knowledge base, and role-based access control.
+A full-stack helpdesk application built with React.js, Node.js, Express.js, and SQLite. This system provides a complete ticketing solution with user management, knowledge base, and role-based access control.
 
-## 🌐 **LIVE DEMO**
+## 🚀 Features
 
-**🚀 [View Live Application](https://crossover-ticket.netlify.app)**
+### ✅ User Management
 
-- **Frontend**: https://crossover-ticket.netlify.app
-- **Backend API**: https://crossover-helpdesk.onrender.com
-- **Repository**: https://github.com/samritbasnet/crossover-helpdesk
+- JWT authentication (login/signup)
+- Role-based access control (User, Agent, Admin)
+- Password hashing with bcrypt
+- Session management
 
-> **Try it out!** Create an account, submit tickets, browse the knowledge base, and experience a professional helpdesk system in action.
+### ✅ Ticket System
 
----
+- Create tickets with title, description, priority
+- View tickets with role-based filtering
+- Update ticket status: Open → In Progress → Resolved
+- Assign tickets to agents
+- Add resolution notes
+- Delete tickets (admin/owner only)
 
-## 🗂 Project Structure
+### ✅ Knowledge Base
 
-```
-crossover-helpdesk/
-├── client/        # React frontend
-└── server/        # Express backend with MySQL
-```
+- Browse articles by category
+- Search articles by keywords
+- Mark articles as helpful
+- Create/edit articles (admin/creator only)
+
+### ✅ Dashboard
+
+- User dashboard: View submitted tickets
+- Agent dashboard: Manage all tickets with filters
+- Statistics and ticket counts
+- Status-based filtering
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React.js, Material-UI, SCSS
+- **Backend**: Node.js, Express.js, REST APIs, JWT
+- **Database**: SQLite
+- **Authentication**: JWT tokens
+- **Styling**: Material-UI components
+
+## 📋 Prerequisites
+
+- Node.js (v18 or higher)
+- npm
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js (v14+)
-- MySQL (v5.7+ or MariaDB 10.3+)
-- npm or yarn
+### 1. Install Dependencies
 
-### 1. Database Setup
+```bash
+# Install server dependencies
+cd server
+npm install
 
-1. Create a MySQL database:
-   ```sql
-   CREATE DATABASE crossover_helpdesk CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
+# Install client dependencies
+cd ../client
+npm install
+```
 
-2. Create a MySQL user and grant privileges:
-   ```sql
-   CREATE USER 'crossover_user'@'localhost' IDENTIFIED BY 'your_secure_password';
-   GRANT ALL PRIVILEGES ON crossover_helpdesk.* TO 'crossover_user'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
+### 2. Initialize Database
 
-### 2. Server Setup
+```bash
+# From the root directory
+node init-db.js
+```
+
+This will create:
+
+- SQLite database with all required tables
+- Test users (admin, agent, regular user)
+- Sample knowledge base articles
+
+### 3. Start the Application
+
+**Terminal 1 - Start Backend Server:**
 
 ```bash
 cd server
-npm install
-cp .env.example .env
-# Edit .env file with your MySQL credentials
-npm run migrate    # Run database migrations
-npm run dev       # Start the server at http://localhost:3000
-```
-
-2) **Client Setup**
-
-```bash
-cd client
-npm install
-cp .env.example .env  # Copy environment template
-# Edit .env file with your API URL
-npm start             # opens http://localhost:3001 (CRA default)
-```
-
-3) **First Time Setup**
-
-```bash
-# The database will be created automatically
-# Default admin user will be created on first run
-# Or create a user via the signup page
-```
-
-📄 Environment Variables
-
-Server (`server/.env`):
-
-```
-PORT=3000
-JWT_SECRET=change-me
-```
-
-Client (`client/.env`):
-
-```
-REACT_APP_API_BASE=http://localhost:3000/api
-```
-
-🛣 API Endpoints (short list)
-
-- Auth: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/verify`
-- Tickets: `GET/POST /api/tickets`, `GET/PUT/DELETE /api/tickets/:id` (requires Bearer token)
-- Knowledge: `GET /api/knowledge`, `GET /api/knowledge/:id`, `POST /api/knowledge/:id/helpful`, `POST/PUT/DELETE /api/knowledge` (protected)
-
-⚙️ Scripts
-
-Server (inside `server/`):
-
-- `npm run dev` → start backend (nodemon)
-- `npm start` → start backend
-
-Client (inside `client/`):
-
-- `npm start` → start React dev server
-- `npm run build` → production build
-
-🛠 Tech Stack
-
-- **Frontend**: React, Material-UI, Axios, React Router
-- **Backend**: Node.js, Express.js, SQLite3, JWT
-- **Email**: Nodemailer (Gmail/SendGrid support)
-- **Deployment**: Netlify (Frontend) + Render (Backend)
-- **Database**: SQLite with custom query helpers
-
-📚 Documentation
-
-- **API Documentation**: See [API.md](./API.md) for complete endpoint documentation
-- **Email Setup**: See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for email notification configuration
-- **Environment Setup**: Use `.env.example` files as templates
-- **Database**: SQLite database created automatically on first run
-
-🚀 Deployment
-
-**Production Deployment:**
-
-1) **Server (Node.js hosting)**
-```bash
-cd server
-npm install --production
-cp .env.example .env
-# Set production environment variables
 npm start
 ```
 
-2) **Client (Static hosting)**
+Server runs on: http://localhost:3001
+
+**Terminal 2 - Start Frontend:**
+
 ```bash
 cd client
-cp .env.example .env
-# Set REACT_APP_API_BASE to your production API URL
-npm run build
-# Deploy the 'build' folder to your static host
+npm start
 ```
 
-**Docker Deployment:**
-```bash
-# Build and run with Docker Compose (if docker-compose.yml exists)
-docker-compose up --build
+Frontend runs on: http://localhost:3000
+
+## 👥 Test Accounts
+
+| Role  | Email              | Password | Access                  |
+| ----- | ------------------ | -------- | ----------------------- |
+| Admin | admin@helpdesk.com | admin123 | Full system access      |
+| Agent | agent@helpdesk.com | agent123 | Ticket management       |
+| User  | user@helpdesk.com  | user123  | Create/view own tickets |
+
+## 🔧 API Endpoints
+
+### Authentication
+
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `GET /api/auth/verify` - Verify token
+
+### Tickets
+
+- `GET /api/tickets` - List tickets (with filters)
+- `POST /api/tickets` - Create ticket
+- `GET /api/tickets/:id` - Get ticket details
+- `PUT /api/tickets/:id` - Update ticket
+- `DELETE /api/tickets/:id` - Delete ticket
+
+### Knowledge Base
+
+- `GET /api/knowledge` - List articles (with search)
+- `GET /api/knowledge/:id` - Get article details
+- `POST /api/knowledge` - Create article (authenticated)
+- `PUT /api/knowledge/:id` - Update article (authenticated)
+- `DELETE /api/knowledge/:id` - Delete article (authenticated)
+- `POST /api/knowledge/:id/helpful` - Mark as helpful
+
+## 📊 Database Schema
+
+### Users Table
+
+- id, name, email, password, role, created_at, updated_at
+
+### Tickets Table
+
+- id, title, description, status, priority, category, user_id, assigned_to, resolution_notes, resolved_at, created_at, updated_at
+
+### Knowledge Base Table
+
+- id, title, content, category, keywords, helpful_count, created_by, created_at, updated_at
+
+## 🎨 Frontend Features
+
+### Material-UI Components
+
+- Modern, responsive design
+- Professional helpdesk interface
+- Consistent styling throughout
+
+### Navigation
+
+- Role-based menu items
+- Protected routes
+- Automatic redirects based on user role
+
+### Forms
+
+- Ticket creation with validation
+- User registration/login
+- Knowledge base article creation
+
+## 🐛 Troubleshooting
+
+### Server won't start
+
+- Check if port 3001 is available
+- Ensure all dependencies are installed
+- Check database file permissions
+
+### Frontend won't connect
+
+- Verify server is running on port 3001
+- Check browser console for CORS errors
+- Ensure proxy configuration is correct
+
+### Database errors
+
+- Delete `server/helpdesk.db` and run `node init-db.js` again
+- Check file permissions on database file
+
+## 📁 Project Structure
+
+```
+crossover-helpdesk/
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/     # Reusable components
+│   │   ├── pages/         # Page components
+│   │   ├── context/       # React context
+│   │   ├── services/      # API services
+│   │   └── utils/         # Utility functions
+│   └── package.json
+├── server/                # Node.js backend
+│   ├── config/           # Database configuration
+│   ├── controllers/      # Business logic
+│   ├── middleware/       # Express middleware
+│   ├── routes/          # API routes
+│   ├── utils/           # Utility functions
+│   └── package.json
+├── init-db.js           # Database initialization
+├── SETUP_INSTRUCTIONS.md # Detailed setup guide
+└── README.md            # This file
 ```
 
-🔧 Development
+## 🚀 Deployment
 
-**Available Scripts:**
-- `npm run dev` - Start development server with hot reload
-- `npm start` - Start production server
-- `npm test` - Run tests (if configured)
+The application is ready for deployment to platforms like:
 
-**Code Quality:**
-- ESLint configured for consistent code style
-- Prettier for code formatting
-- Zero warnings/errors in production build
+- Heroku
+- Netlify (frontend) + Railway (backend)
+- AWS
+- DigitalOcean
 
-✅ Features
+For production deployment, ensure to:
 
-- **Authentication**: JWT-based with role management (user/agent/admin)
-- **Ticket Management**: Full CRUD with status tracking and assignment
-- **Knowledge Base**: Self-service articles with search and voting
-- **Email Notifications**: Beautiful HTML emails for ticket updates with user preferences
-- **User Management**: Profile management and role-based permissions
-- **Settings Dashboard**: Email preferences and account management
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Error Handling**: Comprehensive error states and network error recovery
-- **Professional UI**: Material-UI components with consistent theming
+1. Set environment variables
+2. Use a production database (PostgreSQL recommended)
+3. Configure CORS for your domain
+4. Set up proper JWT secrets
 
-🛡️ Security
+## 📝 License
 
-- JWT token authentication
-- Password hashing with bcrypt
-- CORS protection
-- Input validation and sanitization
-- Role-based access control
-- SQL injection prevention with parameterized queries
+This project is licensed under the MIT License.
 
-📊 Performance
+## 🤝 Contributing
 
-- Lightweight SQLite database
-- Efficient pagination for large datasets
-- Optimized React components with proper state management
-- Lazy loading and code splitting ready
-- Production-optimized builds
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-## 🌟 Live Deployment Showcase
+## 📞 Support
 
-**This project demonstrates:**
-- ✅ **Full-stack deployment** (Frontend: Netlify, Backend: Render)
-- ✅ **Production-ready configuration** with environment variables
-- ✅ **Professional CI/CD** with automatic deployments from GitHub
-- ✅ **Scalable architecture** ready for team collaboration
-- ✅ **Enterprise-grade features** suitable for real-world use
+For support or questions, please open an issue in the repository.
 
-**Perfect for:**
-- 💼 **Portfolio demonstrations**
-- 🎯 **Technical interviews**
-- 👥 **Team lead presentations**
-- 🚀 **Production deployment examples**
+---
+
+**Your helpdesk application is now fully functional and ready for use! 🎉**

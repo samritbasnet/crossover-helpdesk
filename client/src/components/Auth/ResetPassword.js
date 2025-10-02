@@ -24,7 +24,7 @@ const ResetPassword = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [isRequest, setIsRequest] = useState(!token);
+  const [isRequest] = useState(!token);
 
   const handleChange = (e) => {
     setFormData({

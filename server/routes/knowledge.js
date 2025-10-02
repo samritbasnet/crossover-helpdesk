@@ -50,7 +50,7 @@ router.get("/", async (req, res) => {
     }
 
     let query = `SELECT k.*, u.name AS created_by_name, u.email AS created_by_email
-                 FROM knowledge k
+                 FROM knowledge_base k
                  JOIN users u ON k.created_by = u.id`;
     if (where.length) query += " WHERE " + where.join(" AND ");
     query += " ORDER BY helpful_count DESC, created_at DESC LIMIT ? OFFSET ?";
@@ -63,7 +63,7 @@ router.get("/", async (req, res) => {
     const items = await getAllQuery(query, params);
 
     // Total count for pagination
-    let countQuery = "SELECT COUNT(*) AS total FROM knowledge";
+    let countQuery = "SELECT COUNT(*) AS total FROM knowledge_base";
     const countParams = [];
     if (where.length) {
       countQuery += " WHERE " + where.join(" AND ");
@@ -84,7 +84,9 @@ router.get("/", async (req, res) => {
     });
   } catch (err) {
     console.error("Get knowledge error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch knowledge" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch knowledge" });
   }
 });
 
@@ -94,16 +96,19 @@ router.get("/:id", async (req, res) => {
     const { id } = req.params;
     const row = await getQuery(
       `SELECT k.*, u.name AS created_by_name, u.email AS created_by_email
-       FROM knowledge k
+       FROM knowledge_base k
        JOIN users u ON k.created_by = u.id
        WHERE k.id = ?`,
       [id]
     );
-    if (!row) return res.status(404).json({ success: false, message: "Not found" });
+    if (!row)
+      return res.status(404).json({ success: false, message: "Not found" });
     res.json({ success: true, data: row });
   } catch (err) {
     console.error("Get knowledge by id error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch knowledge" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch knowledge" });
   }
 });
 
@@ -111,13 +116,26 @@ router.get("/:id", async (req, res) => {
 router.post("/:id/helpful", async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await getQuery("SELECT id, helpful_count FROM knowledge WHERE id = ?", [id]);
-    if (!existing) return res.status(404).json({ success: false, message: "Not found" });
-    await runQuery("UPDATE knowledge SET helpful_count = helpful_count + 1 WHERE id = ?", [id]);
-    res.json({ success: true, message: "Thank you for your feedback!", helpful_count: (existing.helpful_count || 0) + 1 });
+    const existing = await getQuery(
+      "SELECT id FROM knowledge_base WHERE id = ?",
+      [id]
+    );
+    if (!existing)
+      return res.status(404).json({ success: false, message: "Not found" });
+    await runQuery(
+      "UPDATE knowledge_base SET helpful_count = COALESCE(helpful_count, 0) + 1 WHERE id = ?",
+      [id]
+    );
+    res.json({
+      success: true,
+      message: "Thank you for your feedback!",
+      helpful_count: (existing.helpful_count || 0) + 1,
+    });
   } catch (err) {
     console.error("Mark helpful error:", err);
-    res.status(500).json({ success: false, message: "Failed to update helpful count" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update helpful count" });
   }
 });
 
@@ -129,17 +147,32 @@ router.post("/", async (req, res) => {
   try {
     const { title, content, keywords = "", category = "general" } = req.body;
     if (!title || !content) {
-      return res.status(400).json({ success: false, message: "Title and content are required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Title and content are required" });
     }
     const result = await runQuery(
-      "INSERT INTO knowledge (title, content, keywords, category, created_by) VALUES (?, ?, ?, ?, ?)",
-      [title.trim(), content.trim(), keywords.trim(), category.trim(), req.user.userId]
+      "INSERT INTO knowledge_base (title, content, keywords, category, created_by) VALUES (?, ?, ?, ?, ?)",
+      [
+        title.trim(),
+        content.trim(),
+        keywords.trim(),
+        category.trim(),
+        req.user.userId,
+      ]
     );
-    const created = await getQuery("SELECT * FROM knowledge WHERE id = ?", [result.id]);
-    res.status(201).json({ success: true, message: "Article created", data: created });
+    const created = await getQuery(
+      "SELECT * FROM knowledge_base WHERE id = ?",
+      [result.id]
+    );
+    res
+      .status(201)
+      .json({ success: true, message: "Article created", data: created });
   } catch (err) {
     console.error("Create knowledge error:", err);
-    res.status(500).json({ success: false, message: "Failed to create knowledge" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to create knowledge" });
   }
 });
 
@@ -149,31 +182,59 @@ router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const { title, content, keywords, category } = req.body;
 
-    const existing = await getQuery("SELECT * FROM knowledge WHERE id = ?", [id]);
-    if (!existing) return res.status(404).json({ success: false, message: "Not found" });
+    const existing = await getQuery(
+      "SELECT * FROM knowledge_base WHERE id = ?",
+      [id]
+    );
+    if (!existing)
+      return res.status(404).json({ success: false, message: "Not found" });
 
     // Only creator or admin can edit
     if (existing.created_by !== req.user.userId && req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
     }
 
     const fields = [];
     const params = [];
-    if (title !== undefined) { fields.push("title = ?"); params.push(title.trim()); }
-    if (content !== undefined) { fields.push("content = ?"); params.push(content.trim()); }
-    if (keywords !== undefined) { fields.push("keywords = ?"); params.push(keywords.trim()); }
-    if (category !== undefined) { fields.push("category = ?"); params.push(category.trim()); }
+    if (title !== undefined) {
+      fields.push("title = ?");
+      params.push(title.trim());
+    }
+    if (content !== undefined) {
+      fields.push("content = ?");
+      params.push(content.trim());
+    }
+    if (keywords !== undefined) {
+      fields.push("keywords = ?");
+      params.push(keywords.trim());
+    }
+    if (category !== undefined) {
+      fields.push("category = ?");
+      params.push(category.trim());
+    }
     if (!fields.length) {
-      return res.status(400).json({ success: false, message: "No valid fields provided" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No valid fields provided" });
     }
     params.push(id);
-    await runQuery(`UPDATE knowledge SET ${fields.join(", ")} WHERE id = ?`, params);
+    await runQuery(
+      `UPDATE knowledge_base SET ${fields.join(", ")} WHERE id = ?`,
+      params
+    );
 
-    const updated = await getQuery("SELECT * FROM knowledge WHERE id = ?", [id]);
+    const updated = await getQuery(
+      "SELECT * FROM knowledge_base WHERE id = ?",
+      [id]
+    );
     res.json({ success: true, message: "Article updated", data: updated });
   } catch (err) {
     console.error("Update knowledge error:", err);
-    res.status(500).json({ success: false, message: "Failed to update knowledge" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update knowledge" });
   }
 });
 
@@ -181,18 +242,26 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await getQuery("SELECT * FROM knowledge WHERE id = ?", [id]);
-    if (!existing) return res.status(404).json({ success: false, message: "Not found" });
+    const existing = await getQuery(
+      "SELECT * FROM knowledge_base WHERE id = ?",
+      [id]
+    );
+    if (!existing)
+      return res.status(404).json({ success: false, message: "Not found" });
 
     if (existing.created_by !== req.user.userId && req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
     }
 
-    await runQuery("DELETE FROM knowledge WHERE id = ?", [id]);
+    await runQuery("DELETE FROM knowledge_base WHERE id = ?", [id]);
     res.json({ success: true, message: "Article deleted" });
   } catch (err) {
     console.error("Delete knowledge error:", err);
-    res.status(500).json({ success: false, message: "Failed to delete knowledge" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to delete knowledge" });
   }
 });
 

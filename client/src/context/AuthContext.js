@@ -56,34 +56,69 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (credentials) => {
     try {
+      console.log('Attempting login with credentials:', {
+        email: credentials.email,
+        hasPassword: !!credentials.password
+      });
+      
       // Clear any existing authentication state
       setUser(null);
       setToken(null);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
 
-      // Call login API
-      const response = await authAPI.login(credentials);
+      try {
+        // Call login API
+        console.log('Calling authAPI.login...');
+        const response = await authAPI.login(credentials);
+        console.log('Login API response received');
 
-      // Extract token and user data
-      const { token: newToken, user: userData } = response;
+        // Handle different response formats
+        const responseData = response.data || response;
+        
+        if (!responseData) {
+          throw new Error('Empty response from server');
+        }
 
-      // Validate response
-      if (!newToken || !userData) {
-        throw new Error("Invalid login response");
+        const { token: newToken, user: userData } = responseData;
+
+        // Validate response
+        if (!newToken || !userData) {
+          console.error('Invalid login response format:', responseData);
+          throw new Error("Invalid login response format");
+        }
+
+        // Store authentication data
+        localStorage.setItem("token", newToken);
+        localStorage.setItem("user", JSON.stringify(userData));
+        console.log('Authentication data stored in localStorage');
+
+        // Update state
+        setToken(newToken);
+        setUser(userData);
+        console.log('Auth state updated');
+
+        return { success: true, user: userData };
+      } catch (error) {
+        // Handle axios errors
+        if (error.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          console.error('Login failed with status:', error.response.status);
+          console.error('Response data:', error.response.data);
+          throw new Error(error.response.data?.message || 'Login failed');
+        } else if (error.request) {
+          // The request was made but no response was received
+          console.error('No response received:', error.request);
+          throw new Error('No response from server. Please try again.');
+        } else {
+          // Something happened in setting up the request
+          console.error('Error setting up request:', error.message);
+          throw error;
+        }
       }
-
-      // Store authentication data
-      localStorage.setItem("token", newToken);
-      localStorage.setItem("user", JSON.stringify(userData));
-
-      // Update state
-      setToken(newToken);
-      setUser(userData);
-
-      return { success: true };
     } catch (error) {
-      console.error("Login failed:", error.message);
+      console.error("Login failed:", error);
 
       // Clear any partial state on error
       setUser(null);
@@ -93,7 +128,7 @@ export const AuthProvider = ({ children }) => {
 
       return {
         success: false,
-        message: error.message || "Login failed. Please try again.",
+        message: error.response?.data?.message || error.message || "Login failed. Please try again.",
       };
     }
   };

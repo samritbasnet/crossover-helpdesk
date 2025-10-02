@@ -30,8 +30,8 @@
     "express": "^4.19.2",
     "express-handlebars": "^8.0.1",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.15.1",
-    "nodemailer": "^6.10.1"
+    "nodemailer": "^6.10.1",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

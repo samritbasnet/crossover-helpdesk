@@ -1,5 +1,4 @@
 // Main App Component - Entry point with routing and authentication
-import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import React from "react";
 import {
@@ -10,8 +9,8 @@ import {
 } from "react-router-dom";
 import UpdateTicket from "./components/Agent/UpdateTicket";
 import Login from "./components/Auth/Login";
-import Signup from "./components/Auth/Signup";
 import ResetPassword from "./components/Auth/ResetPassword";
+import Signup from "./components/Auth/Signup";
 import Loading from "./components/common/Loading";
 import ArticleDetail from "./components/Knowledge/ArticleDetail";
 import Navbar from "./components/Layout/Navbar";
@@ -23,8 +22,8 @@ import AgentDashboard from "./pages/AgentDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
-import UserDashboard from "./pages/UserDashboard";
 import SupportManagement from "./pages/SupportManagement";
+import UserDashboard from "./pages/UserDashboard";
 import { USER_ROLES } from "./utils/constants";
 
 // Import the API test page
@@ -37,7 +36,7 @@ const publicRoutes = [
   { path: "/reset-password", element: <ResetPassword /> },
   { path: "/knowledge", element: <KnowledgeBase /> },
   { path: "/knowledge/:id", element: <ArticleDetail /> },
-  { path: "/api-test", element: <ApiTest /> }
+  { path: "/api-test", element: <ApiTest /> },
 ];
 
 // Create Material-UI theme
@@ -71,9 +70,10 @@ const PublicRoute = ({ children }) => {
     return <Loading message="Checking authentication..." />;
   }
 
-  const dashboardRoute = user?.role === USER_ROLES.AGENT || user?.role === USER_ROLES.ADMIN 
-    ? "/agent-dashboard" 
-    : "/dashboard";
+  const dashboardRoute =
+    user?.role === USER_ROLES.AGENT || user?.role === USER_ROLES.ADMIN
+      ? "/agent-dashboard"
+      : "/dashboard";
 
   return user ? <Navigate to={dashboardRoute} /> : children;
 };
@@ -88,17 +88,13 @@ const AppRoutes = () => {
           <Routes>
             {/* Default route redirects to login */}
             <Route path="/" element={<Navigate to="/login" replace />} />
-            
+
             {/* Public routes */}
             {publicRoutes.map(({ path, element }) => (
               <Route
                 key={path}
                 path={path}
-                element={
-                  <PublicRoute>
-                    {element}
-                  </PublicRoute>
-                }
+                element={<PublicRoute>{element}</PublicRoute>}
               />
             ))}
 
@@ -172,7 +168,7 @@ const AppRoutes = () => {
 
             {/* Default Route */}
             <Route path="/" element={<Navigate to="/dashboard" />} />
-            
+
             {/* 404 Route - Must be last */}
             <Route path="*" element={<NotFound />} />
           </Routes>
