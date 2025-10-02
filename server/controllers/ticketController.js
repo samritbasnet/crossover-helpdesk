@@ -8,6 +8,7 @@ const {
 const {
   sendTicketCreatedNotification,
   sendTicketResolvedNotification,
+  sendTicketAssignedNotification,
 } = require("../services/emailService");
 
 // Constants for validation
@@ -500,9 +501,26 @@ const takeTicket = async (req, res) => {
 
     // Check if ticket is already assigned
     if (ticket.assigned_to) {
+      // Check if it's assigned to the current agent
+      if (ticket.assigned_to === userId) {
+        return res.status(400).json({
+          success: false,
+          message: "You have already taken this ticket",
+        });
+      }
+
+      // Get the assigned agent's name
+      const assignedAgent = await getQuery(
+        "SELECT name FROM users WHERE id = ?",
+        [ticket.assigned_to]
+      );
+
+      const agentName = assignedAgent ? assignedAgent.name : "another agent";
+
       return res.status(400).json({
         success: false,
-        message: "Ticket is already assigned to another agent",
+        message: `Ticket is already assigned to ${agentName}`,
+        assignedToName: agentName,
       });
     }
 
@@ -556,9 +574,27 @@ const assignTicket = async (req, res) => {
       });
     }
 
+    let agent = null;
+    let user = null;
+
+    // Check if ticket is already assigned to a different agent
+    if (ticket.assigned_to && ticket.assigned_to != assignedTo) {
+      const currentAgent = await getQuery(
+        "SELECT name FROM users WHERE id = ?",
+        [ticket.assigned_to]
+      );
+      const currentAgentName = currentAgent ? currentAgent.name : "another agent";
+      
+      return res.status(400).json({
+        success: false,
+        message: `Ticket is already assigned to ${currentAgentName}. Please unassign first if you want to reassign.`,
+        alreadyAssignedTo: currentAgentName,
+      });
+    }
+
     // Verify agent exists and is actually an agent
     if (assignedTo) {
-      const agent = await getQuery(
+      agent = await getQuery(
         "SELECT * FROM users WHERE id = ? AND role = 'agent'",
         [assignedTo]
       );
@@ -569,6 +605,11 @@ const assignTicket = async (req, res) => {
           message: "Invalid agent ID",
         });
       }
+
+      // Get user details for email notification
+      user = await getQuery("SELECT name FROM users WHERE id = ?", [
+        ticket.user_id,
+      ]);
     }
 
     // Update ticket assignment
@@ -577,11 +618,28 @@ const assignTicket = async (req, res) => {
       [assignedTo || null, ticketId]
     );
 
+    // Send email notification to agent if ticket was assigned
+    if (assignedTo && agent && user) {
+      try {
+        await sendTicketAssignedNotification(ticket, agent, user);
+      } catch (emailError) {
+        console.error(
+          "Failed to send assignment notification:",
+          emailError.message
+        );
+        // Don't fail the request if email fails
+      }
+    }
+
+    // Prepare response with agent name
+    const responseMessage = assignedTo
+      ? `Ticket assigned successfully to ${agent.name}`
+      : "Ticket unassigned successfully";
+
     res.json({
       success: true,
-      message: assignedTo
-        ? "Ticket assigned successfully"
-        : "Ticket unassigned successfully",
+      message: responseMessage,
+      assignedTo: assignedTo ? agent.name : null,
     });
   } catch (error) {
     console.error("Assign ticket error:", error.message);

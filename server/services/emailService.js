@@ -224,16 +224,82 @@ const sendTicketCreatedNotification = async (ticket, user) => {
   return await sendEmail(mailOptions, "Ticket creation");
 };
 
+/**
+ * Create email template for ticket assignment notification
+ * @param {Object} ticket - Ticket object with id, title, description, priority
+ * @param {Object} agent - Agent object with name, email
+ * @param {Object} user - User object with name
+ * @returns {string} - HTML email template
+ */
+const createTicketAssignedTemplate = (ticket, agent, user) => {
+  return `
+    <div style="${EMAIL_STYLES.container}">
+      <h2 style="${EMAIL_STYLES.header}">🎫 New Ticket Assignment</h2>
+
+      <p>Hello ${agent.name},</p>
+
+      <p>A new support ticket has been assigned to you:</p>
+
+      <div style="${EMAIL_STYLES.ticketBox}">
+        <h3>Ticket #${ticket.id}: ${ticket.title}</h3>
+        <p><strong>Priority:</strong> ${ticket.priority}</p>
+        <p><strong>From:</strong> ${user.name}</p>
+        <p><strong>Description:</strong></p>
+        <p>${ticket.description}</p>
+      </div>
+
+      <p>Please log in to the helpdesk system to view and work on this ticket.</p>
+
+      <p>Best regards,<br>Helpdesk System</p>
+    </div>
+  `;
+};
+
+/**
+ * Send email notification when ticket is assigned to agent
+ * @param {Object} ticket - Ticket object with id, title, description, priority
+ * @param {Object} agent - Agent object with name, email
+ * @param {Object} user - User object with name
+ * @returns {Promise<boolean>} - True if successful, false otherwise
+ */
+const sendTicketAssignedNotification = async (ticket, agent, user) => {
+  // Validate required fields
+  const ticketRequiredFields = ["id", "title", "description", "priority"];
+  const agentRequiredFields = ["name", "email"];
+  const userRequiredFields = ["name"];
+
+  if (
+    !validateEmailData(ticket, ticketRequiredFields) ||
+    !validateEmailData(agent, agentRequiredFields) ||
+    !validateEmailData(user, userRequiredFields)
+  ) {
+    return false;
+  }
+
+  // Create email options
+  const mailOptions = {
+    from: EMAIL_CONFIG.FROM,
+    to: agent.email,
+    subject: `New Ticket Assigned: #${ticket.id} - ${ticket.title}`,
+    html: createTicketAssignedTemplate(ticket, agent, user),
+  };
+
+  // Send email using helper function
+  return await sendEmail(mailOptions, "Ticket assignment");
+};
+
 // Export all functions for use in other modules
 module.exports = {
   // Main email functions
   initEmailService,
   sendTicketResolvedNotification,
   sendTicketCreatedNotification,
+  sendTicketAssignedNotification,
 
   // Helper functions (exported for testing purposes)
   validateEmailData,
   sendEmail,
   createTicketResolvedTemplate,
   createTicketCreatedTemplate,
+  createTicketAssignedTemplate,
 };
