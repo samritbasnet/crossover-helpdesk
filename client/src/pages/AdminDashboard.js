@@ -10,6 +10,7 @@ import {
   TrendingUp,
 } from "@mui/icons-material";
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -56,6 +57,7 @@ const AdminDashboard = () => {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -88,14 +90,36 @@ const AdminDashboard = () => {
 
   const handleAssignTicket = async () => {
     try {
-      await ticketsAPI.assignTicket(selectedTicket.id, selectedAgent);
+      const response = await ticketsAPI.assignTicket(
+        selectedTicket.id,
+        selectedAgent
+      );
+
+      // Show success message with agent name
+      if (response.data.success && response.data.assignedTo) {
+        setSuccessMessage(
+          `✅ Ticket assigned successfully to ${response.data.assignedTo}!`
+        );
+        // Clear success message after 5 seconds
+        setTimeout(() => setSuccessMessage(""), 5000);
+      } else if (response.data.success) {
+        // Handle unassignment case
+        setSuccessMessage("✅ Ticket unassigned successfully!");
+        setTimeout(() => setSuccessMessage(""), 5000);
+      }
+
       setAssignDialogOpen(false);
       setAnchorEl(null);
       setSelectedTicket(null);
       setSelectedAgent("");
       loadDashboardData(); // Refresh data
     } catch (err) {
-      setError(err.message || "Failed to assign ticket");
+      // Handle specific error messages from backend
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError(err.message || "Failed to assign ticket");
+      }
     }
   };
 
@@ -121,9 +145,15 @@ const AdminDashboard = () => {
   };
 
   const openAssignDialog = () => {
+    if (!selectedTicket || !selectedTicket.id) {
+      setError("No ticket selected for assignment");
+      handleMenuClose();
+      return;
+    }
     setAssignDialogOpen(true);
-    setSelectedAgent(selectedTicket?.assigned_to || "");
-    handleMenuClose();
+    setSelectedAgent(selectedTicket.assigned_to || "");
+    // Close the menu but keep selectedTicket for the dialog
+    setAnchorEl(null);
   };
 
   // Statistics cards
@@ -168,6 +198,13 @@ const AdminDashboard = () => {
       </Typography>
 
       <ErrorMessage error={error} />
+
+      {/* Success Message */}
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {successMessage}
+        </Alert>
+      )}
 
       {/* Statistics Overview */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -226,25 +263,17 @@ const AdminDashboard = () => {
         <Button
           variant="contained"
           color="primary"
-          onClick={() => navigate("/admin/users")}
+          onClick={() => navigate("/knowledge")}
           sx={{ mr: 2 }}
         >
-          Manage Users
-        </Button>
-        <Button
-          variant="contained"
-          color="secondary"
-          onClick={() => navigate("/admin/agents")}
-          sx={{ mr: 2 }}
-        >
-          Manage Agents
-        </Button>
-        <Button variant="outlined" onClick={() => navigate("/knowledge")}>
           Knowledge Base
         </Button>
         <Button variant="contained" onClick={() => navigate("/create-ticket")}>
           Create Ticket
         </Button>
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Focus on ticket management and system administration! 🎯
+        </Typography>
       </Box>
 
       {/* All Tickets Table */}
@@ -305,6 +334,9 @@ const AdminDashboard = () => {
                       <IconButton
                         size="small"
                         onClick={(e) => handleMenuClick(e, ticket)}
+                        id={`actions-menu-${ticket.id}`}
+                        aria-label={`Actions menu for ticket ${ticket.id}`}
+                        aria-haspopup="true"
                       >
                         <MoreVert />
                       </IconButton>
@@ -356,8 +388,22 @@ const AdminDashboard = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
+        disableAutoFocusItem
+        MenuListProps={{
+          "aria-labelledby": selectedTicket
+            ? `actions-menu-${selectedTicket.id}`
+            : "actions-menu",
+        }}
       >
-        <MenuItem onClick={() => navigate(`/ticket/${selectedTicket?.id}`)}>
+        <MenuItem
+          onClick={() => {
+            if (selectedTicket?.id) {
+              navigate(`/ticket/${selectedTicket.id}`);
+            }
+            setAnchorEl(null);
+            setSelectedTicket(null);
+          }}
+        >
           <Edit sx={{ mr: 1 }} />
           View Details
         </MenuItem>
@@ -366,7 +412,13 @@ const AdminDashboard = () => {
           Assign Ticket
         </MenuItem>
         <MenuItem
-          onClick={() => handleDeleteTicket(selectedTicket?.id)}
+          onClick={() => {
+            if (selectedTicket?.id) {
+              handleDeleteTicket(selectedTicket.id);
+            }
+            setAnchorEl(null);
+            setSelectedTicket(null);
+          }}
           sx={{ color: "error.main" }}
         >
           <Delete sx={{ mr: 1 }} />

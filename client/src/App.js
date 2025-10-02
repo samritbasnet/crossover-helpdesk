@@ -16,7 +16,6 @@ import ArticleDetail from "./components/Knowledge/ArticleDetail";
 import Navbar from "./components/Layout/Navbar";
 import CreateTicket from "./components/Tickets/CreateTicket";
 import EditTicket from "./components/Tickets/EditTicket";
-import TicketDetails from "./components/Tickets/TicketDetails";
 import TicketDetailsView from "./components/Tickets/TicketDetailsView";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -27,9 +26,6 @@ import Settings from "./pages/Settings";
 import SupportManagement from "./pages/SupportManagement";
 import UserDashboard from "./pages/UserDashboard";
 import { USER_ROLES } from "./utils/constants";
-
-// Import the API test page
-import ApiTest from "./pages/ApiTest";
 
 // Role-based dashboard component
 const RoleBasedDashboard = () => {
@@ -53,7 +49,6 @@ const publicRoutes = [
   { path: "/reset-password", element: <ResetPassword /> },
   { path: "/knowledge", element: <KnowledgeBase /> },
   { path: "/knowledge/:id", element: <ArticleDetail /> },
-  { path: "/api-test", element: <ApiTest /> },
 ];
 
 // Create Material-UI theme
@@ -136,7 +131,7 @@ const AppRoutes = () => {
               path="/ticket/:id"
               element={
                 <ProtectedRoute>
-                  <TicketDetails />
+                  <TicketDetailsView />
                 </ProtectedRoute>
               }
             />
@@ -161,14 +156,6 @@ const AppRoutes = () => {
               element={
                 <ProtectedRoute>
                   <AgentDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/ticket/:id"
-              element={
-                <ProtectedRoute>
-                  <TicketDetailsView />
                 </ProtectedRoute>
               }
             />

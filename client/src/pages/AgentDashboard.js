@@ -8,6 +8,7 @@ import {
   Visibility,
 } from "@mui/icons-material";
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -53,8 +54,10 @@ const AgentDashboard = () => {
   const [stats, setStats] = useState({});
   const [myTickets, setMyTickets] = useState([]);
   const [unassignedTickets, setUnassignedTickets] = useState([]);
+  const [resolvedTickets, setResolvedTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
@@ -79,7 +82,19 @@ const AgentDashboard = () => {
         ]);
 
       setStats(statsResponse.data.stats);
-      setMyTickets(myTicketsResponse.data.tickets || []);
+
+      // Filter out resolved tickets from main table
+      const activeTickets = (myTicketsResponse.data.tickets || []).filter(
+        (ticket) => ticket.status !== "resolved" && ticket.status !== "closed"
+      );
+      setMyTickets(activeTickets);
+
+      // Get resolved tickets for history
+      const resolvedTickets = (myTicketsResponse.data.tickets || []).filter(
+        (ticket) => ticket.status === "resolved" || ticket.status === "closed"
+      );
+      setResolvedTickets(resolvedTickets);
+
       setUnassignedTickets(unassignedResponse.data.tickets || []);
     } catch (err) {
       setError(err.message || "Failed to load dashboard data");
@@ -90,7 +105,34 @@ const AgentDashboard = () => {
 
   const handleUpdateTicket = async () => {
     try {
-      await ticketsAPI.updateTicket(selectedTicket.id, updateData);
+      if (!selectedTicket || !selectedTicket.id) {
+        setError("No ticket selected for update");
+        return;
+      }
+
+      // Validate resolution notes when resolving
+      if (
+        updateData.status === "resolved" &&
+        !updateData.resolution_notes.trim()
+      ) {
+        setError("Resolution notes are required when resolving a ticket");
+        return;
+      }
+
+      const response = await ticketsAPI.updateTicket(
+        selectedTicket.id,
+        updateData
+      );
+
+      // Show success message if ticket was resolved
+      if (updateData.status === "resolved") {
+        setSuccessMessage(
+          `Thanks for fixing ${selectedTicket.user_name}'s ticket! 🎉`
+        );
+        // Clear success message after 5 seconds
+        setTimeout(() => setSuccessMessage(""), 5000);
+      }
+
       setUpdateDialogOpen(false);
       setAnchorEl(null);
       setSelectedTicket(null);
@@ -103,10 +145,19 @@ const AgentDashboard = () => {
 
   const handleTakeTicket = async (ticketId) => {
     try {
-      await ticketsAPI.takeTicket(ticketId);
-      loadDashboardData(); // Refresh data
+      const response = await ticketsAPI.takeTicket(ticketId);
+      if (response.data.success) {
+        loadDashboardData(); // Refresh data
+      }
     } catch (err) {
-      setError(err.message || "Failed to take ticket");
+      // Check if it's an already assigned error
+      if (err.response?.data?.message?.includes("already assigned")) {
+        const assignedAgentName =
+          err.response?.data?.assignedToName || "another agent";
+        setError(`This ticket is already taken by ${assignedAgentName}`);
+      } else {
+        setError(err.message || "Failed to take ticket");
+      }
     }
   };
 
@@ -121,12 +172,18 @@ const AgentDashboard = () => {
   };
 
   const openUpdateDialog = () => {
+    if (!selectedTicket || !selectedTicket.id) {
+      setError("No ticket selected for update");
+      handleMenuClose();
+      return;
+    }
     setUpdateDialogOpen(true);
     setUpdateData({
-      status: selectedTicket?.status || "",
-      resolution_notes: selectedTicket?.resolution_notes || "",
+      status: selectedTicket.status || "",
+      resolution_notes: selectedTicket.resolution_notes || "",
     });
-    handleMenuClose();
+    // Close the menu but keep selectedTicket for the dialog
+    setAnchorEl(null);
   };
 
   // Statistics cards
@@ -172,9 +229,16 @@ const AgentDashboard = () => {
 
       <ErrorMessage error={error} />
 
+      {/* Success Message */}
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {successMessage}
+        </Alert>
+      )}
+
       {/* Statistics Overview */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard
             title="My Tickets"
             value={stats.myTickets || 0}
@@ -182,7 +246,7 @@ const AgentDashboard = () => {
             color="primary"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard
             title="Unassigned"
             value={stats.unassignedTickets || 0}
@@ -190,7 +254,7 @@ const AgentDashboard = () => {
             color="warning"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard
             title="Resolved"
             value={stats.myResolvedTickets || 0}
@@ -210,9 +274,9 @@ const AgentDashboard = () => {
         >
           Knowledge Base
         </Button>
-        <Button variant="outlined" onClick={() => navigate("/create-ticket")}>
-          Create Ticket
-        </Button>
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Focus on resolving tickets and helping users! 🎯
+        </Typography>
       </Box>
 
       {/* My Assigned Tickets */}
@@ -269,6 +333,9 @@ const AgentDashboard = () => {
                       <IconButton
                         size="small"
                         onClick={(e) => handleMenuClick(e, ticket)}
+                        id={`actions-menu-${ticket.id}`}
+                        aria-label={`Actions menu for ticket ${ticket.id}`}
+                        aria-haspopup="true"
                       >
                         <MoreVert />
                       </IconButton>
@@ -341,17 +408,103 @@ const AgentDashboard = () => {
         </CardContent>
       </Card>
 
+      {/* Ticket History - Resolved Tickets */}
+      {resolvedTickets.length > 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              🎉 Ticket History - Resolved Tickets
+            </Typography>
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              Great work! Here are the tickets you've successfully resolved.
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>ID</TableCell>
+                    <TableCell>Title</TableCell>
+                    <TableCell>User</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Priority</TableCell>
+                    <TableCell>Resolved</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {resolvedTickets.map((ticket) => (
+                    <TableRow key={ticket.id}>
+                      <TableCell>#{ticket.id}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="text"
+                          onClick={() => navigate(`/ticket/${ticket.id}`)}
+                          sx={{
+                            textAlign: "left",
+                            p: 0,
+                            textTransform: "none",
+                          }}
+                        >
+                          <Typography variant="body2" noWrap>
+                            {ticket.title}
+                          </Typography>
+                        </Button>
+                      </TableCell>
+                      <TableCell>{ticket.user_name}</TableCell>
+                      <TableCell>
+                        <Chip
+                          icon={<CheckCircle />}
+                          label={ticket.status}
+                          color={getStatusColor(ticket.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={ticket.priority}
+                          color={getPriorityColor(ticket.priority)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {formatDateTime(
+                          ticket.resolved_at || ticket.updated_at
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => navigate(`/ticket/${ticket.id}`)}
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Update Ticket Dialog */}
       <Dialog
         open={updateDialogOpen}
-        onClose={() => setUpdateDialogOpen(false)}
+        onClose={() => {
+          setUpdateDialogOpen(false);
+          setSelectedTicket(null);
+          setUpdateData({ status: "", resolution_notes: "" });
+        }}
         maxWidth="sm"
         fullWidth
       >
         <DialogTitle>Update Ticket</DialogTitle>
         <DialogContent>
           <Typography variant="body2" gutterBottom>
-            Update ticket #{selectedTicket?.id}: {selectedTicket?.title}
+            Update ticket #{selectedTicket?.id || "Unknown"}:{" "}
+            {selectedTicket?.title || "Unknown Ticket"}
           </Typography>
 
           <FormControl fullWidth sx={{ mt: 2 }}>
@@ -380,10 +533,29 @@ const AgentDashboard = () => {
             }
             sx={{ mt: 2 }}
             placeholder="Add notes about the resolution..."
+            required={updateData.status === "resolved"}
+            error={
+              updateData.status === "resolved" &&
+              !updateData.resolution_notes.trim()
+            }
+            helperText={
+              updateData.status === "resolved" &&
+              !updateData.resolution_notes.trim()
+                ? "Resolution notes are required when resolving a ticket"
+                : ""
+            }
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUpdateDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setUpdateDialogOpen(false);
+              setSelectedTicket(null);
+              setUpdateData({ status: "", resolution_notes: "" });
+            }}
+          >
+            Cancel
+          </Button>
           <Button onClick={handleUpdateTicket} variant="contained">
             Update Ticket
           </Button>
@@ -395,6 +567,12 @@ const AgentDashboard = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
+        disableAutoFocusItem
+        MenuListProps={{
+          "aria-labelledby": selectedTicket
+            ? `actions-menu-${selectedTicket.id}`
+            : "actions-menu",
+        }}
       >
         <MenuItem onClick={() => navigate(`/ticket/${selectedTicket?.id}`)}>
           <Visibility sx={{ mr: 1 }} />

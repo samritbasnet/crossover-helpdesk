@@ -28,6 +28,7 @@ import {
 } from "@mui/material";
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { ticketsAPI } from "../../services/api";
 import {
   formatDateTime,
@@ -40,6 +41,7 @@ import Loading from "../common/Loading";
 const TicketDetailsView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,11 +56,6 @@ const TicketDetailsView = () => {
   const [assignData, setAssignData] = useState({
     assignedTo: "",
   });
-
-  useEffect(() => {
-    loadTicketDetails();
-    loadAgents();
-  }, [loadTicketDetails]);
 
   const loadTicketDetails = useCallback(async () => {
     try {
@@ -77,17 +74,33 @@ const TicketDetailsView = () => {
     }
   }, [id]);
 
-  const loadAgents = async () => {
+  const loadAgents = useCallback(async () => {
     try {
       const response = await ticketsAPI.getAgents();
       setAgents(response.data.agents);
     } catch (err) {
       console.error("Failed to load agents:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadTicketDetails();
+    if (user?.role === "admin") {
+      loadAgents();
+    }
+  }, [loadTicketDetails, loadAgents, user]);
 
   const handleUpdateTicket = async () => {
     try {
+      // Validate resolution notes when resolving
+      if (
+        updateData.status === "resolved" &&
+        !updateData.resolution_notes.trim()
+      ) {
+        setError("Resolution notes are required when resolving a ticket");
+        return;
+      }
+
       await ticketsAPI.updateTicket(id, updateData);
       setUpdateDialogOpen(false);
       loadTicketDetails(); // Refresh ticket details
@@ -127,7 +140,7 @@ const TicketDetailsView = () => {
   if (!ticket) {
     return (
       <Box p={3}>
-        <Typography variant="h6">Ticket not found</Typography>
+        <ErrorMessage error="Ticket not found" />
         <Button
           onClick={() => navigate("/dashboard")}
           startIcon={<ArrowBack />}
@@ -249,14 +262,16 @@ const TicketDetailsView = () => {
                   Update Ticket
                 </Button>
 
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<Assignment />}
-                  onClick={() => setAssignDialogOpen(true)}
-                >
-                  Assign Ticket
-                </Button>
+                {user?.role === "admin" && (
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<Assignment />}
+                    onClick={() => setAssignDialogOpen(true)}
+                  >
+                    Assign Ticket
+                  </Button>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -315,6 +330,17 @@ const TicketDetailsView = () => {
             }
             sx={{ mt: 2 }}
             placeholder="Add notes about the resolution..."
+            required={updateData.status === "resolved"}
+            error={
+              updateData.status === "resolved" &&
+              !updateData.resolution_notes.trim()
+            }
+            helperText={
+              updateData.status === "resolved" &&
+              !updateData.resolution_notes.trim()
+                ? "Resolution notes are required when resolving a ticket"
+                : ""
+            }
           />
         </DialogContent>
         <DialogActions>
